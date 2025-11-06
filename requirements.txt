@@ -1,0 +1,40 @@
+# QuantAITrade 依赖清单
+
+# 核心依赖
+ccxt>=4.0.0              # 交易所统一接口
+pandas>=2.0.0            # 数据处理
+numpy>=1.24.0            # 数值计算
+python-dateutil>=2.8.2   # 日期处理
+
+# 数据库
+sqlite3                  # SQLite（Python内置）
+
+# 任务调度
+apscheduler>=3.10.0      # 定时任务调度
+
+# AI分析
+openai>=1.0.0            # OpenAI API
+tiktoken>=0.5.0          # Token计数
+
+# Web界面
+streamlit>=1.28.0        # Web应用框架
+plotly>=5.17.0           # 交互式图表
+matplotlib>=3.7.0        # 静态图表
+seaborn>=0.12.0          # 统计可视化
+
+# 配置管理
+pyyaml>=6.0              # YAML解析
+python-dotenv>=1.0.0     # 环境变量管理
+
+# HTTP请求
+requests>=2.31.0         # HTTP库
+
+# 日志管理
+loguru>=0.7.0            # 现代化日志库
+
+# 技术指标计算
+ta-lib                   # 技术分析库（可选，需单独安装）
+pandas-ta>=0.3.14b       # Pandas技术分析扩展
+
+# 工具库
+tqdm>=4.66.0             # 进度条

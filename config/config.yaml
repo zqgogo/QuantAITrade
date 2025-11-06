@@ -1,0 +1,78 @@
+# QuantAITrade 主配置文件
+
+# ====== 系统基本配置 ======
+system:
+  name: "QuantAITrade"
+  version: "1.0.0"
+  timezone: "Asia/Shanghai"
+
+# ====== 运行模式配置 ======
+run_mode: "manual"  # manual: 人工模式 | auto: 全自动模式 | hybrid: 混合模式
+
+# ====== 交易对配置 ======
+trading:
+  symbols:
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "SOLUSDT"
+  intervals:
+    - "15m"
+    - "1h"
+    - "4h"
+    - "1d"
+
+# ====== 数据更新配置 ======
+data:
+  fetch_interval_minutes: 60  # 数据抓取频率（分钟）
+  enable_backfill: true       # 是否启用历史回补
+  backfill_days: 30           # 回补天数
+  max_retries: 3              # API失败重试次数
+  retry_delay: 5              # 重试延迟（秒）
+
+# ====== AI分析配置 ======
+ai:
+  enable_ai_analysis: true    # 是否启用AI分析
+  analysis_time: "09:00"      # 每日AI分析执行时间（24小时制）
+  model: "gpt-4"              # AI模型选择
+  max_tokens: 2000            # 最大token数
+  temperature: 0.7            # 创造性参数
+
+# ====== 风控参数配置 ======
+risk_control:
+  # 仓位控制
+  max_position_percent: 0.03   # 单仓位资金占比上限（3%）
+  max_total_position: 0.8      # 总仓位上限（80%）
+  max_daily_trades: 10         # 每日最大交易次数
+  
+  # 止损配置
+  default_stop_loss_type: "fixed_percent"  # 默认止损类型
+  stop_loss_percent: 0.03                  # 固定止损比例（3%）
+  trailing_stop_percent: 0.02              # 移动止损回撤比例（2%）
+  atr_period: 14                           # ATR计算周期
+  atr_multiplier: 2.0                      # ATR止损倍数
+  max_holding_days: 30                     # 最大持仓天数
+  enable_manual_stop_override: true        # 允许手动覆盖止损价
+  
+  # 价格检查
+  max_price_deviation: 0.01    # 订单价格与市价最大偏差（1%）
+
+# ====== 日志配置 ======
+logging:
+  log_level: "INFO"           # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_retention_days: 30      # 日志保留天数
+  log_to_console: true        # 是否输出到控制台
+  log_to_file: true           # 是否输出到文件
+
+# ====== 数据库配置 ======
+database:
+  path: "data/kline.db"       # 数据库文件路径
+  backup_enabled: true        # 是否自动备份
+  backup_interval_days: 7     # 备份间隔（天）
+
+# ====== UI配置 ======
+ui:
+  port: 8501                  # Streamlit端口
+  theme: "dark"               # 主题: dark | light
+  refresh_interval: 60        # 数据刷新间隔（秒）
+  show_ai_panel: true         # 显示AI分析面板
+  show_log_panel: true        # 显示日志面板

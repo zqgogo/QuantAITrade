@@ -1,0 +1,71 @@
+# AI分析配置文件
+
+# ====== AI分析基本设置 ======
+analysis:
+  enabled: true
+  frequency: "daily"          # 分析频率: daily, hourly, custom
+  schedule_time: "09:00"      # 定时分析时间
+  timezone: "Asia/Shanghai"
+
+# ====== AI模型配置 ======
+model:
+  provider: "openai"          # AI提供商: openai, anthropic, local
+  name: "gpt-4"               # 模型名称
+  max_tokens: 2000            # 最大token数
+  temperature: 0.7            # 创造性参数 (0.0-1.0)
+  top_p: 0.9                  # 核采样参数
+
+# ====== 分析输入数据范围 ======
+data_scope:
+  market_kline_days: 30       # 市场K线数据天数
+  strategy_signal_days: 7     # 策略信号历史天数
+  trade_record_days: 30       # 交易记录天数
+  include_external_news: false # 是否包含外部新闻
+
+# ====== AI权限设置 ======
+permissions:
+  allow_auto_execute: false        # 允许AI自动执行交易
+  allow_suspend_strategy: true     # 允许AI建议暂停策略
+  allow_tune_params: true          # 允许AI建议调整参数
+  max_param_change_percent: 0.2    # 参数调整最大幅度（20%）
+
+# ====== 分析输出配置 ======
+output:
+  save_to_database: true           # 保存到数据库
+  generate_report: true            # 生成分析报告
+  report_format: "markdown"        # 报告格式: markdown, html, pdf
+  send_notification: false         # 发送通知
+  notification_channels:           # 通知渠道
+    - "log"
+    # - "email"
+    # - "telegram"
+
+# ====== 提示词模板配置 ======
+prompts:
+  system_role: |
+    你是一位专业的加密货币量化交易分析师，拥有丰富的技术分析和风险管理经验。
+    你的任务是基于市场数据和策略表现，提供客观、可执行的分析建议。
+  
+  analysis_template: |
+    请分析以下交易数据：
+    
+    **市场概况**：
+    {market_summary}
+    
+    **策略表现**：
+    {strategy_performance}
+    
+    **交易记录**：
+    {trade_records}
+    
+    请从以下方面进行分析：
+    1. 市场趋势判断（多头/空头/震荡）
+    2. 各策略表现评估
+    3. 风险等级评估
+    4. 具体的参数优化建议
+    
+    输出格式要求：JSON格式，包含以下字段：
+    - market_trend: 市场趋势
+    - risk_level: 风险等级
+    - strategy_suggestions: 策略建议列表
+    - risk_alerts: 风险提示

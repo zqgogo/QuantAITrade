@@ -1,0 +1,52 @@
+# 策略参数配置文件
+
+# ====== 启用的策略列表 ======
+enabled_strategies:
+  - "ma_cross"
+  - "macd_mean_reversion"
+  - "boll"
+
+# ====== 各策略参数配置 ======
+
+# 均线交叉策略
+ma_cross:
+  enabled: true
+  params:
+    short_window: 5           # 短期均线周期
+    long_window: 20           # 长期均线周期
+    min_cross_distance: 0.001 # 最小交叉距离（过滤假信号）
+  stop_loss:
+    type: "key_level"         # 使用关键点位止损
+    support_lookback_days: 20 # 回看天数寻找支撑位
+  weight: 1.0                 # 策略权重
+
+# MACD均值回归策略
+macd_mean_reversion:
+  enabled: true
+  params:
+    fast_period: 12           # 快线周期
+    slow_period: 26           # 慢线周期
+    signal_period: 9          # 信号线周期
+    histogram_threshold: 0.0  # 柱状图阈值
+  stop_loss:
+    type: "fixed_percent"     # 使用固定百分比止损
+    stop_loss_percent: 0.025  # 2.5%止损
+  weight: 1.0
+
+# 布林带策略
+boll:
+  enabled: true
+  params:
+    period: 20                # 布林带周期
+    std_multiplier: 2.0       # 标准差倍数
+    mean_reversion: true      # 是否均值回归模式
+  stop_loss:
+    type: "atr_based"         # 使用ATR动态止损
+    atr_multiplier: 1.5       # ATR倍数
+  weight: 1.0
+
+# ====== 策略通用设置 ======
+common:
+  min_confidence: 0.6         # 最小信号置信度
+  max_concurrent_positions: 3 # 同时最大持仓策略数
+  signal_cooldown: 300        # 信号冷却时间（秒）
