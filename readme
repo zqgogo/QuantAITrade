@@ -1,0 +1,312 @@
+完美，这一步非常关键。
+我已经将完整的配置体系（包括文件说明、示例、配置分层理念、运行检查等）**无缝整合进 README.md**，
+使得整个项目蓝图更完整、更可落地。
+
+以下是更新后的 **完整版 README.md（含配置系统）** 👇
+
+---
+
+# 🧠 QuantAITrade — 智能量化交易系统
+
+## 🧩 概述
+
+**QuantAITrade** 是一个结合 **量化策略 + AI 分析 + 人工干预 + 可视化界面** 的综合性数字资产交易系统。
+它支持从数据获取 → 策略运行 → 回测模拟 → 实盘交易 → AI 复盘分析 → 策略动态优化的完整闭环。
+
+系统设计目标：
+
+* 🕒 定时自动拉取并更新行情数据（默认每 30 分钟或 1 小时）
+* ⚙️ 支持多策略动态加载、修改、删除
+* 💡 引入 AI 分析决策机制，可选择开启/关闭 AI 干预
+* 📊 Web 界面可视化，查看行情、策略表现、盈亏分析
+* 🧪 支持回测、模拟盘、实盘三种模式
+* 💰 可多币种并行运行，低耦合、可扩展
+* 🔐 内置止损保护、风险参数控制
+* 🤝 模块化架构，方便后期接入股票、期货等市场
+
+---
+
+## 🏗️ 系统架构
+
+```
+QuantAITrade/
+├── main.py                     # 启动入口（运行即启动Web界面与系统后台）
+├── config/
+│   ├── settings.py             # 全局配置（参数、数据库路径、API配置等）
+│   ├── ai_config.py            # AI分析模型、参数、策略分析选项
+│   ├── strategy_config.py      # 策略注册表、默认参数模板
+│   ├── ui_config.py            # 前端UI相关配置
+│   └── __init__.py
+│
+├── data/
+│   ├── data_fetcher.py         # 定时获取币安行情数据
+│   ├── db_manager.py           # SQLite数据库操作封装
+│   ├── scheduler.py            # 定时任务调度（数据更新、策略运行、AI分析等）
+│   └── kline.db                # 数据库文件（行情数据、交易记录、回测数据）
+│
+├── strategy/
+│   ├── base_strategy.py        # 策略基类（通用接口、回测逻辑）
+│   ├── macd_strategy.py        # 示例策略：MACD
+│   ├── boll_strategy.py        # 示例策略：布林带
+│   ├── ma_strategy.py          # 示例策略：均线交叉
+│   └── __init__.py
+│
+├── ai/
+│   ├── ai_decision.py          # AI决策模块（分析行情、策略、盈亏）
+│   ├── ai_advisor.py           # AI建议生成模块
+│   ├── ai_executor.py          # 当开启AI干预时执行AI建议
+│   └── __init__.py
+│
+├── backtest/
+│   ├── backtest_engine.py      # 历史回测核心逻辑
+│   ├── simulator.py            # 模拟盘引擎
+│   └── analyzer.py             # 回测结果与绩效分析
+│
+├── trade/
+│   ├── exchange_api.py         # 交易所API封装（币安）
+│   ├── trade_executor.py       # 执行交易指令（支持实盘与模拟盘）
+│   ├── risk_manager.py         # 风控模块（止损、限仓、杠杆限制等）
+│   └── position_manager.py     # 仓位与账户管理
+│
+├── ui/
+│   ├── app.py                  # Web界面入口（FastAPI + React前端）
+│   ├── components/             # 前端组件（图表、控制面板、日志、AI建议）
+│   ├── templates/              # 页面模板
+│   └── static/                 # 前端静态资源
+│
+├── logs/
+│   ├── system.log
+│   ├── trade.log
+│   ├── ai.log
+│   └── backtest.log
+│
+└── README.md
+```
+
+---
+
+## ⚙️ 系统配置说明
+
+所有配置文件默认放在：
+
+```
+QuantAITrade/config/
+```
+
+### ✅ 1. `settings.py` — 系统全局配置
+
+系统运行的主要控制参数，包括模式选择、数据库路径、定时任务间隔、日志级别等。
+
+```python
+# config/settings.py
+SYSTEM_NAME = "QuantAITrade"
+LOG_LEVEL = "INFO"
+
+DATA_FETCH_INTERVAL = 60 * 60  # 每小时更新一次
+DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+DEFAULT_INTERVALS = ["15m", "1h", "4h", "1d"]
+
+DB_PATH = "data/kline.db"
+
+RUN_MODE = "simulation"  # backtest, simulation, live
+ENABLE_AI_DECISION = False
+ENABLE_AI_SUGGESTION = True
+
+STOP_LOSS_PERCENT = 0.03
+MAX_POSITION_SIZE = 1000.0
+LEVERAGE = 2
+
+USE_TESTNET = True
+TRADE_MODE = "futures"
+
+LOG_DIR = "logs/"
+```
+
+---
+
+### ✅ 2. `ai_config.py` — AI 模块配置
+
+控制AI决策逻辑与行为。
+
+```python
+# config/ai_config.py
+AI_ANALYSIS_INTERVAL = 4 * 60 * 60  # 每4小时分析一次
+
+ALLOW_AI_TO_EXECUTE = False
+ALLOW_AI_TO_SUSPEND_STRATEGY = True
+ALLOW_AI_TO_TUNE_PARAMS = True
+
+AI_MODEL = "gpt-5"
+AI_API_KEY = ""
+AI_ANALYSIS_DEPTH = "medium"
+```
+
+---
+
+### ✅ 3. `strategy_config.py` — 策略注册与参数配置
+
+注册可用策略与默认参数。
+
+```python
+# config/strategy_config.py
+STRATEGY_REGISTRY = {
+    "macd": {
+        "path": "strategy.macd_strategy.MACDStrategy",
+        "params": {"fast": 12, "slow": 26, "signal": 9},
+    },
+    "boll": {
+        "path": "strategy.boll_strategy.BollStrategy",
+        "params": {"period": 20, "multiplier": 2},
+    },
+    "ma": {
+        "path": "strategy.ma_strategy.MAStrategy",
+        "params": {"short_window": 5, "long_window": 20},
+    },
+}
+
+ENABLED_STRATEGIES = ["macd", "boll"]
+```
+
+---
+
+### ✅ 4. `ui_config.py` — 界面配置
+
+```python
+# config/ui_config.py
+UI_PORT = 8000
+UI_REFRESH_INTERVAL = 60
+THEME = "dark"
+SHOW_AI_PANEL = True
+SHOW_LOG_PANEL = True
+DEFAULT_DASHBOARD = "overview"
+```
+
+---
+
+### ✅ 5. 环境变量（可选）
+
+可通过环境变量覆盖部分配置：
+
+```bash
+export BINANCE_API_KEY="your_key"
+export BINANCE_API_SECRET="your_secret"
+export OPENAI_API_KEY="your_ai_key"
+export RUN_MODE="live"
+```
+
+代码中加载方式：
+
+```python
+import os
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
+RUN_MODE = os.getenv("RUN_MODE", "simulation")
+```
+
+---
+
+### ✅ 6. 配置加载器（推荐）
+
+建议统一配置加载入口，便于模块化访问：
+
+```python
+# utils/config_loader.py
+import importlib
+
+def load_config(name: str):
+    return importlib.import_module(f"config.{name}")
+```
+
+使用：
+
+```python
+from utils.config_loader import load_config
+settings = load_config("settings")
+ai_cfg = load_config("ai_config")
+```
+
+---
+
+### ✅ 7. 运行前检查
+
+| 配置项                  | 必要性       | 默认值           | 说明          |
+| -------------------- | --------- | ------------- | ----------- |
+| `BINANCE_API_KEY`    | ⚠️ 必须（实盘） | 空             | 币安账户API Key |
+| `DB_PATH`            | ✅ 必须      | data/kline.db | 数据库存储路径     |
+| `DEFAULT_SYMBOLS`    | ✅ 必须      | BTC/ETH/SOL   | 运行币种        |
+| `RUN_MODE`           | ✅ 必须      | simulation    | 模拟 or 实盘    |
+| `ENABLE_AI_DECISION` | 可选        | False         | 是否允许AI干预交易  |
+| `STOP_LOSS_PERCENT`  | ✅ 推荐      | 0.03          | 止损比例        |
+| `LEVERAGE`           | ✅ 推荐      | 2             | 杠杆倍数        |
+| `LOG_LEVEL`          | 可选        | INFO          | 系统日志级别      |
+
+---
+
+### ✅ 8. 配置分层理念
+
+| 层级                  | 配置内容    | 修改频率 | 说明      |
+| ------------------- | ------- | ---- | ------- |
+| 全局（settings）        | 系统运行逻辑  | 较低   | 基础运行环境  |
+| 策略（strategy_config） | 交易策略与参数 | 较高   | 经常调整    |
+| AI（ai_config）       | 分析与干预逻辑 | 中等   | 随AI模块优化 |
+| UI（ui_config）       | 展示层     | 较低   | 用户界面配置  |
+
+---
+
+## 🧠 模块说明（略 — 同前述内容）
+
+*(省略与前文重复的模块介绍段落，保持结构完整)*
+
+---
+
+## ⚙️ 启动方式
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
+
+浏览器访问：
+
+```
+http://127.0.0.1:8000
+```
+
+---
+
+## 📜 系统理念
+
+> “让 AI 帮助人思考，而非代替人决策”
+
+* AI 仅提供建议或复盘，不直接操作（除非开启执行模式）
+* 用户可灵活切换：
+
+  * **纯量化模式**（AI关闭）
+  * **AI辅助模式**（AI仅分析）
+  * **AI执行模式**（AI可动态调参或暂停策略）
+
+---
+
+## 🚀 未来扩展
+
+| 模块   | 扩展内容                       |
+| ---- | -------------------------- |
+| 市场接入 | 股票、期货API（如Tushare、IB、OKX等） |
+| AI模型 | 接入大语言模型（如GPT、Claude）分析交易日志 |
+| 策略优化 | 自动参数调优（遗传算法 / 强化学习）        |
+| 风控   | 多层风控体系：账户、策略、AI层级控制        |
+
+---
+
+✅ **总结：**
+这份 README 现已完整包括：
+
+* 架构说明
+* 模块划分
+* 启动方式
+* 配置体系（settings、ai、strategy、ui 四大配置文件）
+* 环境变量
+* 配置加载器
+* 运行前检查
+* 扩展设计
+
+---
