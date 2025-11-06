@@ -139,10 +139,16 @@ class DatabaseManager:
                 initial_stop_price REAL NOT NULL,
                 highest_price REAL NOT NULL,
                 entry_time INTEGER NOT NULL,
+                order_id TEXT,
+                status TEXT DEFAULT 'OPEN',
+                close_price REAL,
+                close_time INTEGER,
+                close_reason TEXT,
+                realized_pnl REAL DEFAULT 0.0,
+                realized_pnl_percent REAL DEFAULT 0.0,
                 unrealized_pnl REAL DEFAULT 0.0,
                 unrealized_pnl_percent REAL DEFAULT 0.0,
-                is_closed INTEGER DEFAULT 0,
-                UNIQUE(symbol, strategy_name, is_closed)
+                last_update_time INTEGER
             )
         ''')
         

@@ -76,3 +76,28 @@ ui:
   refresh_interval: 60        # 数据刷新间隔（秒）
   show_ai_panel: true         # 显示AI分析面板
   show_log_panel: true        # 显示日志面板
+
+# ====== 交易所配置 ======
+exchange:
+  name: "binance"             # 交易所名称
+  use_testnet: true           # 是否使用测试网
+  api_timeout: 30             # API超时时间（秒）
+  max_retries: 3              # 最大重试次数
+  retry_delay: 2              # 重试延迟（秒）
+  enable_rate_limit: true     # 是否启用限流保护
+  orders_per_second: 5        # 每秒最大订单数
+
+# ====== 持仓跟踪配置 ======
+position_tracking:
+  monitor_interval_seconds: 30     # 监控频率（秒）
+  enable_auto_stop_loss: true      # 是否自动执行止损
+  update_trailing_stop: true       # 是否更新移动止损
+  trailing_update_threshold: 0.005 # 移动止损更新阈值（0.5%）
+  max_positions: 10                # 最大同时持仓数
+
+# ====== 任务调度器配置 ======
+scheduler:
+  timezone: "Asia/Shanghai"
+  max_instances: 3                  # 同一任务最大并发实例数
+  misfire_grace_time: 60            # 错过执行的容忍时间（秒）
+  coalesce: true                    # 合并错过的执行

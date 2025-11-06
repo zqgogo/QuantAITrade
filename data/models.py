@@ -189,3 +189,35 @@ class BacktestResult:
             'parameters': self.parameters,
             'created_at': self.created_at
         }
+
+
+@dataclass
+class Order:
+    """订单模型"""
+    symbol: str
+    side: OrderSide
+    order_type: OrderType
+    quantity: float
+    price: Optional[float] = None  # 限价单价格
+    order_id: Optional[str] = None  # 交易所订单ID
+    client_order_id: Optional[str] = None  # 客户端订单ID
+    executed_qty: float = 0.0  # 已成交数量
+    status: OrderStatus = OrderStatus.NEW
+    created_time: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+    updated_time: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'symbol': self.symbol,
+            'side': self.side.value,
+            'order_type': self.order_type.value,
+            'quantity': self.quantity,
+            'price': self.price,
+            'order_id': self.order_id,
+            'client_order_id': self.client_order_id,
+            'executed_qty': self.executed_qty,
+            'status': self.status.value,
+            'created_time': self.created_time,
+            'updated_time': self.updated_time
+        }
