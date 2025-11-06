@@ -1,178 +1,82 @@
 """
-AI 分析器 - 简化版本
-提供基础的 AI 分析功能框架
+AI分析器 - 增强版
 """
-
 import os
+import json
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from loguru import logger
 from openai import OpenAI
 
 from data.db_manager import db_manager
 from config import get_config
+from ai.ai_data_preparer import ai_data_preparer
+from ai.ai_prompt_builder import ai_prompt_builder
+from ai.ai_suggestion_parser import ai_suggestion_parser
 
 
 class AIAnalyzer:
-    """AI 分析器类"""
-    
     def __init__(self):
-        """初始化 AI 分析器"""
         self.config = get_config()
         self.ai_config = self.config.get('ai', {})
-        
-        # 初始化 OpenAI 客户端
         api_key = os.getenv('OPENAI_API_KEY')
         if api_key:
             self.client = OpenAI(api_key=api_key)
-            logger.info("AI 分析器初始化完成")
+            logger.info("AI分析器初始化完成")
         else:
             self.client = None
-            logger.warning("未配置 OPENAI_API_KEY，AI 功能将不可用")
+            logger.warning("未配置OPENAI_API_KEY")
     
-    def run_daily_analysis(self, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """
-        执行每日分析
-        
-        Args:
-            date: 分析日期，格式 'YYYY-MM-DD'，默认为今天
-        
-        Returns:
-            dict: 分析结果
-        """
+    def run_daily_analysis(self, date: Optional[str] = None, lookback_days: int = 7) -> Optional[Dict[str, Any]]:
         if not self.client:
-            logger.error("OpenAI 客户端未初始化")
+            logger.error("OpenAI客户端未初始化")
             return None
-        
         if date is None:
             date = datetime.now().strftime('%Y-%m-%d')
-        
         try:
-            logger.info(f"开始执行每日分析: {date}")
-            
-            # 1. 准备分析数据
-            data = self._prepare_data(date, lookback_days=7)
-            
-            if not data:
-                logger.warning("没有足够的数据进行分析")
+            logger.info(f"开始AI分析: {date}")
+            analysis_data = ai_data_preparer.prepare_daily_analysis_data(date, lookback_days)
+            if not analysis_data:
                 return None
-            
-            # 2. 构建提示词
-            prompt = self._build_prompt(data)
-            
-            # 3. 调用 OpenAI API
-            response = self._call_openai_api(prompt)
-            
-            if response:
-                # 4. 保存分析结果
-                self._save_to_database(date, response)
-                logger.success(f"每日分析完成: {date}")
-                return response
-            
-            return None
-            
+            prompt = ai_prompt_builder.build_daily_analysis_prompt(analysis_data)
+            ai_response = self._call_openai_api(prompt)
+            if not ai_response:
+                return None
+            parsed_result = ai_suggestion_parser.parse_analysis_result(ai_response)
+            if parsed_result:
+                self._save_to_database(date, parsed_result, ai_response)
+            logger.success("AI分析完成")
+            return parsed_result
         except Exception as e:
-            logger.error(f"执行每日分析失败: {e}")
+            logger.exception(f"AI分析失败: {e}")
             return None
     
-    def _prepare_data(self, date: str, lookback_days: int = 7) -> Optional[Dict[str, Any]]:
-        """准备分析数据"""
+    def _call_openai_api(self, prompt: str, max_tokens: Optional[int] = None) -> Optional[str]:
         try:
-            # 这里是简化版本，实际应该从数据库提取更多数据
-            conn = db_manager.get_connection()
-            cursor = conn.cursor()
-            
-            # 获取最近交易记录
-            cursor.execute(
-                """
-                SELECT COUNT(*) as count FROM trade_records 
-                WHERE timestamp >= ?
-                """,
-                (int((datetime.now() - timedelta(days=lookback_days)).timestamp()),)
-            )
-            trade_count = cursor.fetchone()['count']
-            
-            data = {
-                'date': date,
-                'trade_count': trade_count,
-                'lookback_days': lookback_days
-            }
-            
-            logger.debug(f"准备分析数据: {data}")
-            return data
-            
-        except Exception as e:
-            logger.error(f"准备数据失败: {e}")
-            return None
-    
-    def _build_prompt(self, data: Dict[str, Any]) -> str:
-        """构建提示词"""
-        prompt = f"""
-你是一位专业的加密货币量化交易分析师。
-
-请基于以下数据生成每日分析报告：
-
-日期: {data['date']}
-最近 {data['lookback_days']} 天交易次数: {data['trade_count']}
-
-请提供：
-1. 简要市场总结
-2. 风险提示（如有）
-3. 策略建议
-
-请以简洁专业的方式回答。
-"""
-        return prompt
-    
-    def _call_openai_api(self, prompt: str) -> Optional[str]:
-        """调用 OpenAI API"""
-        try:
-            logger.debug("调用 OpenAI API...")
-            
             response = self.client.chat.completions.create(
                 model=self.ai_config.get('model', 'gpt-4'),
                 messages=[
-                    {"role": "system", "content": "你是一位专业的量化交易分析师。"},
+                    {"role": "system", "content": "你是专业的量化交易分析师。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=self.ai_config.get('max_tokens', 2000),
+                max_tokens=max_tokens or self.ai_config.get('max_tokens', 3000),
                 temperature=self.ai_config.get('temperature', 0.7)
             )
-            
-            result = response.choices[0].message.content
-            logger.debug("OpenAI API 调用成功")
-            return result
-            
+            return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"调用 OpenAI API 失败: {e}")
+            logger.error(f"OpenAI调用失败: {e}")
             return None
     
-    def _save_to_database(self, date: str, response: str):
-        """保存分析结果到数据库"""
+    def _save_to_database(self, date: str, parsed_result: Dict[str, Any], raw_response: str):
         try:
             conn = db_manager.get_connection()
             cursor = conn.cursor()
-            
             cursor.execute(
-                """
-                INSERT INTO ai_analysis_log 
-                (analysis_date, market_summary, suggestions, model_version)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    date,
-                    response,
-                    '{}',  # 简化版本，不解析 JSON
-                    self.ai_config.get('model', 'gpt-4')
-                )
+                "INSERT INTO ai_analysis_log (analysis_date, market_summary, suggestions, model_version, raw_response) VALUES (?, ?, ?, ?, ?)",
+                (date, parsed_result.get('market_summary', ''), json.dumps(parsed_result, ensure_ascii=False), self.ai_config.get('model', 'gpt-4'), raw_response)
             )
-            
             conn.commit()
-            logger.debug("分析结果已保存到数据库")
-            
         except Exception as e:
-            logger.error(f"保存分析结果失败: {e}")
+            logger.error(f"保存失败: {e}")
 
-
-# 全局实例
 ai_analyzer = AIAnalyzer()
