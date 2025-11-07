@@ -7,7 +7,7 @@ numpy>=1.24.0            # 数值计算
 python-dateutil>=2.8.2   # 日期处理
 
 # 数据库
-sqlite3                  # SQLite（Python内置）
+# sqlite3                  # SQLite（Python内置）
 
 # 任务调度
 apscheduler>=3.10.0      # 定时任务调度
@@ -23,7 +23,7 @@ matplotlib>=3.7.0        # 静态图表
 seaborn>=0.12.0          # 统计可视化
 
 # 配置管理
-pyyaml>=6.0              # YAML解析
+PyYAML>=6.0              # YAML解析
 python-dotenv>=1.0.0     # 环境变量管理
 
 # HTTP请求
