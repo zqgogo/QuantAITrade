@@ -11,6 +11,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from config import get_config
 
+# 导入任务日志记录器
+from utils.task_logger import task_logger
+
 
 class Scheduler:
     """任务调度器类"""
@@ -62,8 +65,13 @@ class Scheduler:
                 logger.error(f"不支持的触发器类型: {trigger_type}")
                 return False
             
+            # 如果启用了任务日志记录，则包装任务函数
+            wrapped_func = func
+            if self.config.get('task_logging', {}).get('enable_task_log', True):
+                wrapped_func = self._wrap_task_with_logging(func, job_id, name or job_id)
+            
             self.scheduler.add_job(
-                func=func,
+                func=wrapped_func,
                 trigger=trigger,
                 id=job_id,
                 name=name or job_id,
@@ -77,6 +85,40 @@ class Scheduler:
             logger.error(f"添加任务失败: {e}")
             return False
     
+    def _wrap_task_with_logging(self, func: Callable, job_id: str, job_name: str) -> Callable:
+        """
+        包装任务函数以添加日志记录
+        
+        Args:
+            func: 原始任务函数
+            job_id: 任务ID
+            job_name: 任务名称
+            
+        Returns:
+            包装后的函数
+        """
+        def wrapped_func(*args, **kwargs):
+            task_id = None
+            try:
+                # 记录任务开始
+                task_id = task_logger.log_task_start(job_name, 'scheduled')
+                
+                # 执行原始函数
+                result = func(*args, **kwargs)
+                
+                # 记录任务结束
+                if task_id:
+                    task_logger.log_task_end(task_id, {'status': 'success'})
+                
+                return result
+            except Exception as e:
+                # 记录任务失败
+                if task_id:
+                    task_logger.log_task_failed(task_id, str(e))
+                raise
+        
+        return wrapped_func
+
     def remove_job(self, job_id: str) -> bool:
         """移除任务"""
         try:

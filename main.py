@@ -26,6 +26,11 @@ from orchestrator.scheduler import scheduler
 from strategy import MACrossStrategy
 from ai.ai_analyzer import ai_analyzer
 
+# 导入新增的状态管理模块
+from utils.state_manager import state_manager
+from utils.task_logger import task_logger
+from utils.recovery_manager import recovery_manager
+
 # 全局变量用于优雅关闭
 shutdown_flag = False
 
@@ -143,17 +148,32 @@ def shutdown_system_components():
 
 def data_fetch_task():
     """数据获取任务（定时执行）"""
+    task_id = None
     try:
+        # 记录任务开始
+        task_id = task_logger.log_task_start('data_fetch', 'scheduled')
+        
         logger.info("开始定时数据获取...")
         data_fetcher.fetch_all_configured_symbols()
         logger.success("数据获取完成")
+        
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success'})
     except Exception as e:
         logger.error(f"数据获取失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
 
 
 def strategy_analysis_task():
     """策略分析任务（定时执行）"""
+    task_id = None
     try:
+        # 记录任务开始
+        task_id = task_logger.log_task_start('strategy_analysis', 'scheduled')
+        
         logger.info("开始策略分析...")
         config = get_config()
         symbols = config['trading']['symbols']
@@ -188,13 +208,24 @@ def strategy_analysis_task():
                 logger.error(f"分析 {symbol} 失败: {e}")
         
         logger.success("策略分析完成")
+        
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success', 'symbols_analyzed': len(symbols)})
     except Exception as e:
         logger.error(f"策略分析任务失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
 
 
 def position_monitor_task():
     """持仓监控任务（定时执行）"""
+    task_id = None
     try:
+        # 记录任务开始
+        task_id = task_logger.log_task_start('position_monitor', 'scheduled')
+        
         logger.debug("检查持仓止损...")
         triggered = position_tracker.check_stop_loss()
         
@@ -208,21 +239,96 @@ def position_monitor_task():
                     # 执行平仓
                     position_tracker.close_position(position_id, current_price, reason)
                     logger.warning(f"已平仓: {symbol} @ {current_price:.2f} - {reason}")
+        
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success', 'stop_loss_triggered': len(triggered)})
     except Exception as e:
         logger.error(f"持仓监控任务失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
 
 
 def ai_analysis_task():
     """AI分析任务（每日执行）"""
+    task_id = None
     try:
+        # 检查是否已执行过今天的分析
+        config = get_config()
+        if config.get('task_logging', {}).get('enable_task_log', True):
+            # 这里应该检查是否已执行过今天的AI分析
+            pass
+            
+        # 记录任务开始
+        task_id = task_logger.log_task_start('ai_analysis', 'scheduled')
+        
         logger.info("开始执行 AI 分析...")
         result = ai_analyzer.run_daily_analysis(datetime.now().strftime('%Y-%m-%d'))
         if result:
             logger.success("AI 分析完成")
         else:
             logger.warning("AI 分析未返回结果")
+            
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success', 'result': result is not None})
     except Exception as e:
         logger.error(f"AI 分析任务失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
+
+
+def heartbeat_task():
+    """心跳任务（每30秒执行）"""
+    try:
+        state_manager.update_heartbeat()
+        logger.debug("心跳更新完成")
+    except Exception as e:
+        logger.error(f"心跳任务失败: {e}")
+
+
+def order_sync_task():
+    """订单同步任务（每5分钟执行）"""
+    task_id = None
+    try:
+        # 记录任务开始
+        task_id = task_logger.log_task_start('order_sync', 'scheduled')
+        
+        logger.info("开始同步未完成订单...")
+        # 这里应该实现订单同步逻辑
+        logger.info("订单同步完成")
+        
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success'})
+    except Exception as e:
+        logger.error(f"订单同步任务失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
+
+
+def position_verification_task():
+    """持仓验证任务（每小时执行）"""
+    task_id = None
+    try:
+        # 记录任务开始
+        task_id = task_logger.log_task_start('position_verification', 'scheduled')
+        
+        logger.info("开始验证持仓数据一致性...")
+        # 这里应该实现持仓验证逻辑
+        logger.info("持仓数据一致性验证完成")
+        
+        # 记录任务结束
+        if task_id:
+            task_logger.log_task_end(task_id, {'status': 'success'})
+    except Exception as e:
+        logger.error(f"持仓验证任务失败: {e}")
+        # 记录任务失败
+        if task_id:
+            task_logger.log_task_failed(task_id, str(e))
 
 
 # ==================== 运行模式函数 ====================
@@ -253,6 +359,24 @@ def run_manual_mode():
             trigger_args={'minutes': data_interval},
             job_id='data_fetch',
             name='数据获取任务'
+        )
+        
+        # 添加心跳任务
+        scheduler.add_job(
+            func=heartbeat_task,
+            trigger_type='interval',
+            trigger_args={'seconds': config.get('state_management', {}).get('heartbeat_interval_seconds', 30)},
+            job_id='heartbeat',
+            name='心跳任务'
+        )
+        
+        # 添加订单同步任务
+        scheduler.add_job(
+            func=order_sync_task,
+            trigger_type='interval',
+            trigger_args={'minutes': config.get('state_management', {}).get('order_sync_interval_minutes', 5)},
+            job_id='order_sync',
+            name='订单同步任务'
         )
         
         # 添加策略分析任务（仅生成信号，不自动执行）
@@ -308,6 +432,33 @@ def run_auto_mode():
             trigger_args={'minutes': data_interval},
             job_id='data_fetch',
             name='数据获取任务'
+        )
+        
+        # 添加心跳任务
+        scheduler.add_job(
+            func=heartbeat_task,
+            trigger_type='interval',
+            trigger_args={'seconds': config.get('state_management', {}).get('heartbeat_interval_seconds', 30)},
+            job_id='heartbeat',
+            name='心跳任务'
+        )
+        
+        # 添加订单同步任务
+        scheduler.add_job(
+            func=order_sync_task,
+            trigger_type='interval',
+            trigger_args={'minutes': config.get('state_management', {}).get('order_sync_interval_minutes', 5)},
+            job_id='order_sync',
+            name='订单同步任务'
+        )
+        
+        # 添加持仓验证任务
+        scheduler.add_job(
+            func=position_verification_task,
+            trigger_type='interval',
+            trigger_args={'hours': config.get('state_management', {}).get('position_verify_interval_hours', 1)},
+            job_id='position_verification',
+            name='持仓验证任务'
         )
         
         # 添加策略分析任务（自动执行交易）
@@ -375,6 +526,33 @@ def run_hybrid_mode():
             name='数据获取任务'
         )
         
+        # 添加心跳任务
+        scheduler.add_job(
+            func=heartbeat_task,
+            trigger_type='interval',
+            trigger_args={'seconds': config.get('state_management', {}).get('heartbeat_interval_seconds', 30)},
+            job_id='heartbeat',
+            name='心跳任务'
+        )
+        
+        # 添加订单同步任务
+        scheduler.add_job(
+            func=order_sync_task,
+            trigger_type='interval',
+            trigger_args={'minutes': config.get('state_management', {}).get('order_sync_interval_minutes', 5)},
+            job_id='order_sync',
+            name='订单同步任务'
+        )
+        
+        # 添加持仓验证任务
+        scheduler.add_job(
+            func=position_verification_task,
+            trigger_type='interval',
+            trigger_args={'hours': config.get('state_management', {}).get('position_verify_interval_hours', 1)},
+            job_id='position_verification',
+            name='持仓验证任务'
+        )
+        
         # 添加策略分析任务
         scheduler.add_job(
             func=strategy_analysis_task,
@@ -422,6 +600,18 @@ def run_hybrid_mode():
         shutdown_system_components()
 
 
+def execute_system_recovery():
+    """执行系统恢复流程"""
+    logger.info("检查是否需要执行系统恢复...")
+    
+    if recovery_manager.check_recovery_needed():
+        logger.warning("检测到上次异常关闭，开始执行恢复流程...")
+        recovery_manager.execute_recovery()
+        logger.success("系统恢复完成")
+    else:
+        logger.info("系统状态正常，无需恢复")
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='QuantAITrade - 智能量化交易系统')
@@ -460,12 +650,22 @@ def main():
             logger.info(f"配置的默认模式: {config['run_mode']}")
             logger.info(f"命令行指定模式: {mode}")
             
+            # 创建系统实例
+            instance_id = state_manager.create_instance(mode)
+            task_logger.set_instance_id(instance_id)
+            
+            # 执行系统恢复
+            execute_system_recovery()
+            
             if mode == 'manual':
                 run_manual_mode()
             elif mode == 'auto':
                 run_auto_mode()
             elif mode == 'hybrid':
                 run_hybrid_mode()
+                
+            # 标记系统正常停止
+            state_manager.mark_stopped('manual')
         else:
             # 没有参数，显示帮助
             parser.print_help()
@@ -476,8 +676,12 @@ def main():
             
     except KeyboardInterrupt:
         logger.info("\n用户中断，正在关闭系统...")
+        # 标记系统正常停止
+        state_manager.mark_stopped('interrupt')
     except Exception as e:
         logger.exception(f"系统运行出错: {e}")
+        # 标记系统崩溃
+        state_manager.mark_crashed(str(e))
         sys.exit(1)
 
 

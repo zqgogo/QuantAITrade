@@ -184,6 +184,81 @@ class DatabaseManager:
             )
         ''')
         
+        # 创建系统状态表 (system_state)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS system_state (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                instance_id TEXT NOT NULL,
+                run_mode TEXT NOT NULL,
+                status TEXT NOT NULL,
+                start_time INTEGER,
+                stop_time INTEGER,
+                stop_reason TEXT,
+                pid INTEGER,
+                heartbeat_time INTEGER,
+                config_snapshot TEXT,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        ''')
+        
+        # 创建任务执行日志表 (task_execution_log)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS task_execution_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                instance_id TEXT NOT NULL,
+                task_name TEXT NOT NULL,
+                task_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                start_time INTEGER,
+                end_time INTEGER,
+                duration_seconds REAL,
+                result_summary TEXT,
+                error_message TEXT,
+                retry_count INTEGER DEFAULT 0,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        ''')
+        
+        # 创建信号队列表 (signal_queue)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS signal_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                signal_id TEXT NOT NULL,
+                strategy_name TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                price REAL NOT NULL,
+                confidence REAL DEFAULT 0.0,
+                signal_timestamp INTEGER NOT NULL,
+                queue_status TEXT NOT NULL,
+                priority INTEGER DEFAULT 0,
+                submitted_time INTEGER,
+                processed_time INTEGER,
+                order_id TEXT,
+                failure_reason TEXT,
+                expiry_time INTEGER,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        ''')
+        
+        # 创建数据获取进度表 (data_fetch_progress)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS data_fetch_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                interval TEXT NOT NULL,
+                last_fetch_time INTEGER,
+                last_complete_time INTEGER,
+                fetch_status TEXT NOT NULL,
+                total_records INTEGER DEFAULT 0,
+                last_error TEXT,
+                consecutive_failures INTEGER DEFAULT 0,
+                next_fetch_time INTEGER,
+                updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+                UNIQUE(symbol, interval)
+            )
+        ''')
+        
         conn.commit()
         logger.info(f"数据库初始化完成: {self.db_path}")
     

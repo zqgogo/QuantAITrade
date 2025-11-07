@@ -19,6 +19,9 @@ from execution.exchange_connector import exchange_connector
 from execution.risk_controller import risk_controller
 from config import get_config
 
+# 导入信号队列管理器
+from utils.signal_queue_manager import signal_queue_manager
+
 
 @dataclass(order=True)
 class PrioritizedSignal:
@@ -26,6 +29,7 @@ class PrioritizedSignal:
     priority: float = field(compare=True)  # 优先级（置信度，越高越优先）
     signal: Signal = field(compare=False)
     timestamp: float = field(default_factory=time.time, compare=False)
+    signal_id: str = field(default="", compare=False)  # 信号ID，用于持久化
 
 
 class TradeExecutor:
@@ -63,6 +67,9 @@ class TradeExecutor:
             logger.warning("交易执行器已在运行")
             return
         
+        # 从数据库加载未处理的信号
+        self._load_pending_signals()
+        
         self.running = True
         self.executor_thread = threading.Thread(target=self._execute_loop, daemon=True)
         self.executor_thread.start()
@@ -72,6 +79,9 @@ class TradeExecutor:
         """停止交易执行器"""
         if not self.running:
             return
+        
+        # 保存队列中未处理的信号到数据库
+        self._save_pending_signals()
         
         self.running = False
         if self.executor_thread:
@@ -90,10 +100,14 @@ class TradeExecutor:
             bool: 是否成功加入队列
         """
         try:
+            # 保存信号到数据库
+            signal_id = signal_queue_manager.enqueue_signal(signal)
+            
             # 创建优先级信号（优先级 = 置信度，越高越先处理）
             prioritized = PrioritizedSignal(
                 priority=-signal.confidence,  # 负值，因为PriorityQueue是最小堆
-                signal=signal
+                signal=signal,
+                signal_id=signal_id
             )
             
             self.signal_queue.put(prioritized)
@@ -154,6 +168,54 @@ class TradeExecutor:
         
         logger.info("交易执行循环已停止")
     
+    def _load_pending_signals(self):
+        """从数据库加载未处理的信号"""
+        try:
+            pending_signals = signal_queue_manager.dequeue_signals(limit=100)
+            loaded_count = 0
+            
+            for signal_data in pending_signals:
+                try:
+                    # 转换数据库记录为Signal对象
+                    signal = Signal(
+                        strategy_name=signal_data['strategy_name'],
+                        symbol=signal_data['symbol'],
+                        signal_type=SignalType(signal_data['signal_type']),
+                        price=signal_data['price'],
+                        timestamp=signal_data['signal_timestamp'],
+                        confidence=signal_data['confidence']
+                    )
+                    
+                    # 创建优先级信号
+                    prioritized = PrioritizedSignal(
+                        priority=-signal.confidence,
+                        signal=signal,
+                        signal_id=signal_data['signal_id']
+                    )
+                    
+                    self.signal_queue.put(prioritized)
+                    loaded_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"加载信号 {signal_data['signal_id']} 失败: {e}")
+            
+            logger.info(f"从数据库加载 {loaded_count} 个未处理信号")
+            
+        except Exception as e:
+            logger.error(f"加载未处理信号失败: {e}")
+    
+    def _save_pending_signals(self):
+        """保存队列中未处理的信号到数据库"""
+        try:
+            saved_count = 0
+            # 注意：由于PriorityQueue没有直接的遍历方法，我们只能记录当前队列大小
+            # 实际的信号持久化在submit_signal中已经完成
+            queue_size = self.signal_queue.qsize()
+            logger.info(f"队列中还有 {queue_size} 个未处理信号（已持久化）")
+            
+        except Exception as e:
+            logger.error(f"保存未处理信号失败: {e}")
+    
     def _execute_signal(self, signal: Signal):
         """
         执行单个信号
@@ -162,6 +224,13 @@ class TradeExecutor:
             signal: 交易信号
         """
         try:
+            # 获取信号ID（如果是从数据库加载的）
+            signal_id = getattr(signal, 'signal_id', None)
+            
+            # 标记信号处理中
+            if signal_id:
+                signal_queue_manager.mark_signal_processing(signal_id)
+            
             # 1. 获取账户信息
             account_balance = self._get_account_balance()
             if account_balance is None:
@@ -191,6 +260,10 @@ class TradeExecutor:
                 self.stats['orders_success'] += 1
                 logger.success(f"订单执行成功: {order.order_id}")
                 
+                # 标记信号完成
+                if signal_id:
+                    signal_queue_manager.mark_signal_completed(signal_id, order.order_id)
+                
                 # 5. 如果是买入订单，注册持仓监控
                 if signal.signal_type == SignalType.BUY and order.order_id:
                     # 计算止损价（从风控模块获取）
@@ -210,10 +283,19 @@ class TradeExecutor:
                 self.stats['orders_failed'] += 1
                 logger.error(f"订单执行失败: {signal.symbol}")
                 
+                # 标记信号失败
+                if signal_id:
+                    signal_queue_manager.mark_signal_failed(signal_id, "订单提交失败")
+                
         except Exception as e:
             logger.error(f"执行信号失败: {e}")
             self.stats['orders_failed'] += 1
-    
+            
+            # 标记信号失败
+            signal_id = getattr(signal, 'signal_id', None)
+            if signal_id:
+                signal_queue_manager.mark_signal_failed(signal_id, str(e))
+
     def _get_account_balance(self) -> Optional[float]:
         """
         获取账户USDT余额

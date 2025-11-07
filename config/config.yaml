@@ -101,3 +101,26 @@ scheduler:
   max_instances: 3                  # 同一任务最大并发实例数
   misfire_grace_time: 60            # 错过执行的容忍时间（秒）
   coalesce: true                    # 合并错过的执行
+
+# ====== 状态管理配置 ======
+state_management:
+  enable_recovery: true                   # 是否启用恢复机制
+  heartbeat_interval_seconds: 30          # 心跳间隔
+  signal_expiry_minutes: 15               # 信号过期时间
+  order_sync_interval_minutes: 5          # 订单同步间隔
+  position_verify_interval_hours: 1       # 持仓校验间隔
+  max_signal_queue_size: 50               # 信号队列最大长度
+  shutdown_timeout_seconds: 30            # 关闭超时时间
+  data_fetch_max_failures: 5              # 数据获取最大失败次数
+
+# ====== 任务日志配置 ======
+task_logging:
+  enable_task_log: true                   # 是否记录任务日志
+  log_retention_days: 30                  # 任务日志保留天数
+
+# ====== 恢复机制配置 ======
+recovery:
+  auto_recover_signals: true              # 自动恢复未处理信号
+  auto_sync_orders: true                  # 自动同步订单状态
+  auto_recover_positions: true            # 自动恢复持仓监控
+  verify_consistency_on_start: true       # 启动时验证数据一致性

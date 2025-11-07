@@ -24,10 +24,25 @@ class OrderSide(Enum):
 
 class OrderStatus(Enum):
     """订单状态枚举"""
-    PENDING = "PENDING"
+    NEW = "NEW"
+    PARTIALLY_FILLED = "PARTIALLY_FILLED"
     FILLED = "FILLED"
     CANCELED = "CANCELED"
+    PENDING_CANCEL = "PENDING_CANCEL"
     REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+    PENDING = "PENDING"  # 添加缺失的PENDING状态
+
+
+class OrderType(Enum):
+    """订单类型枚举"""
+    MARKET = "MARKET"
+    LIMIT = "LIMIT"
+    STOP = "STOP"
+    STOP_MARKET = "STOP_MARKET"
+    TAKE_PROFIT = "TAKE_PROFIT"
+    TAKE_PROFIT_MARKET = "TAKE_PROFIT_MARKET"
+    TRAILING_STOP = "TRAILING_STOP"
 
 
 class StopLossType(Enum):
