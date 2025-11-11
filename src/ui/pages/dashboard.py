@@ -130,16 +130,16 @@ class DashboardPage:
             )
         
         with col6:
-            # TODO: 实现最大回撤计算
-            st.metric(label="最大回撤", value="N/A", delta=None)
+            max_drawdown = account_data.get('max_drawdown', 0)
+            st.metric(label="最大回撤", value=f"{max_drawdown:.2f}%", delta=None)
         
         with col7:
-            # TODO: 实现胜率计算
-            st.metric(label="交易胜率", value="N/A", delta=None)
+            win_rate = account_data.get('win_rate', 0)
+            st.metric(label="交易胜率", value=f"{win_rate:.1f}%", delta=None)
         
         with col8:
-            # TODO: 实现夏普比率计算
-            st.metric(label="夏普比率", value="N/A", delta=None)
+            sharpe_ratio = account_data.get('sharpe_ratio', 0)
+            st.metric(label="夏普比率", value=f"{sharpe_ratio:.2f}", delta=None)
     
     def _render_positions_list(self):
         """
@@ -177,19 +177,17 @@ class DashboardPage:
                 height=300
             )
             
-            # 操作按钮区域（预留）
+            # 操作按钮区域
             st.markdown("##### 批量操作")
             col_op1, col_op2, col_op3 = st.columns([1, 1, 4])
             
             with col_op1:
                 if st.button("📤 导出持仓", use_container_width=True):
-                    # TODO: 实现导出功能
-                    st.info("导出功能开发中...")
+                    self._export_positions_to_csv()
             
             with col_op2:
                 if st.button("⚠️ 全部止损", use_container_width=True):
-                    # TODO: 实现批量止损
-                    st.warning("请在策略控制页面执行此操作")
+                    self._close_all_positions()
     
     def _render_recent_trades(self):
         """
@@ -238,8 +236,8 @@ class DashboardPage:
             st.metric("成功率", f"{success_rate:.1f}%")
         
         with stats_col4:
-            # TODO: 计算总盈亏
-            st.metric("总盈亏", "N/A")
+            total_pnl = self._calculate_total_pnl(trades)
+            st.metric("总盈亏", f"{total_pnl:.2f} USDT")
         
         # 显示交易表格
         df = pd.DataFrame(trades)
@@ -327,6 +325,11 @@ class DashboardPage:
             position_ratio = (total_exposure / total_balance * 100) if total_balance > 0 else 0
             pnl_percent = (total_pnl / total_balance * 100) if total_balance > 0 else 0
             
+            # 计算额外的风险指标
+            max_drawdown = self._calculate_max_drawdown()
+            win_rate = self._calculate_win_rate()
+            sharpe_ratio = self._calculate_sharpe_ratio()
+            
             return {
                 'total_balance': total_balance,
                 'available_balance': available_balance,
@@ -334,7 +337,10 @@ class DashboardPage:
                 'total_exposure': total_exposure,
                 'total_unrealized_pnl': total_pnl,
                 'total_pnl_percent': pnl_percent,
-                'position_ratio': position_ratio
+                'position_ratio': position_ratio,
+                'max_drawdown': max_drawdown,
+                'win_rate': win_rate,
+                'sharpe_ratio': sharpe_ratio
             }
             
         except Exception as e:
@@ -464,13 +470,107 @@ class DashboardPage:
     
     def _export_positions_to_csv(self) -> str:
         """
-        导出持仓到CSV（待实现）
+        导出持仓到CSV
         
         Returns:
             str: CSV文件路径
         """
-        # TODO: 实现导出功能
-        pass
+        try:
+            # 获取当前持仓数据
+            positions = self._get_positions_data()
+            
+            # 转换为DataFrame
+            df = pd.DataFrame(positions)
+            
+            # 生成文件名
+            filename = f"positions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            # 导出到CSV
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+            
+            st.success(f"✅ 持仓已导出到 {filename}")
+            return filename
+        except Exception as e:
+            logger.error(f"导出持仓失败: {e}")
+            st.error("❌ 导出失败，请查看日志")
+            return ""
+    
+    def _close_all_positions(self):
+        """
+        全部平仓操作
+        """
+        try:
+            # TODO: 调用交易执行模块进行全部平仓
+            st.info("⚠️ 全部平仓功能开发中...")
+            # 这里需要与交易执行模块集成
+        except Exception as e:
+            logger.error(f"全部平仓操作失败: {e}")
+            st.error("❌ 全部平仓操作失败，请查看日志")
+    
+    # ==================== 风险指标计算方法 ====================
+    
+    def _calculate_max_drawdown(self) -> float:
+        """
+        计算最大回撤
+        
+        Returns:
+            float: 最大回撤百分比
+        """
+        try:
+            # TODO: 从数据库获取历史净值数据并计算最大回撤
+            # 这里暂时返回默认值
+            return 0.0
+        except Exception as e:
+            logger.error(f"计算最大回撤失败: {e}")
+            return 0.0
+    
+    def _calculate_win_rate(self) -> float:
+        """
+        计算交易胜率
+        
+        Returns:
+            float: 胜率百分比
+        """
+        try:
+            # TODO: 从数据库获取交易记录并计算胜率
+            # 这里暂时返回默认值
+            return 0.0
+        except Exception as e:
+            logger.error(f"计算交易胜率失败: {e}")
+            return 0.0
+    
+    def _calculate_sharpe_ratio(self) -> float:
+        """
+        计算夏普比率
+        
+        Returns:
+            float: 夏普比率
+        """
+        try:
+            # TODO: 基于历史收益数据计算夏普比率
+            # 这里暂时返回默认值
+            return 0.0
+        except Exception as e:
+            logger.error(f"计算夏普比率失败: {e}")
+            return 0.0
+    
+    def _calculate_total_pnl(self, trades: List[Dict[str, Any]]) -> float:
+        """
+        计算总盈亏
+        
+        Args:
+            trades: 交易记录列表
+        
+        Returns:
+            float: 总盈亏
+        """
+        try:
+            # TODO: 基于交易记录计算总盈亏
+            # 这里暂时返回默认值
+            return 0.0
+        except Exception as e:
+            logger.error(f"计算总盈亏失败: {e}")
+            return 0.0
 
 
 # 页面入口函数

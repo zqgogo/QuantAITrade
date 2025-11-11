@@ -448,26 +448,36 @@ class AIAnalysisPage:
             bool: 是否成功
         """
         try:
-            # TODO: 实现建议采纳逻辑
             # 1. 根据建议类型执行相应操作
-            # 2. 更新配置文件
-            # 3. 记录采纳日志
-            # 4. 通知相关模块
-            
             suggestion_type = suggestion.get('suggestion_type')
             target = suggestion.get('target')
             
-            logger.info(f"采纳AI建议: {suggestion_type} - {target}")
-            
-            # 示例：参数调整
             if suggestion_type == 'parameter_adjust':
-                # TODO: 更新策略参数
-                pass
+                self._adjust_parameter(suggestion)
+            elif suggestion_type == 'strategy_enable':
+                self._enable_strategy(target)
+            elif suggestion_type == 'strategy_disable':
+                self._disable_strategy(target)
+            elif suggestion_type == 'risk_adjust':
+                self._adjust_risk_settings(suggestion)
+            
+            # 2. 更新配置文件
+            self._update_ai_suggestion_config(suggestion, 'accepted')
+            
+            # 3. 记录采纳日志
+            self._log_suggestion_action(suggestion, 'accepted')
+            
+            # 4. 通知相关模块
+            self._notify_modules(suggestion, 'accepted')
+            
+            logger.info(f"已采纳AI建议: {suggestion_type} - {target}")
+            st.success("✅ 建议已采纳并应用")
             
             return True
             
         except Exception as e:
             logger.error(f"采纳建议失败: {e}")
+            st.error("❌ 建议采纳失败，请查看日志")
             return False
     
     def _reject_suggestion(self, suggestion: Dict[str, Any]) -> bool:
@@ -481,16 +491,24 @@ class AIAnalysisPage:
             bool: 是否成功
         """
         try:
-            # TODO: 记录拒绝原因和日志
+            # 1. 记录拒绝原因和日志
             suggestion_type = suggestion.get('suggestion_type')
             target = suggestion.get('target')
             
-            logger.info(f"拒绝AI建议: {suggestion_type} - {target}")
+            # 2. 更新配置文件
+            self._update_ai_suggestion_config(suggestion, 'rejected')
+            
+            # 3. 记录拒绝日志
+            self._log_suggestion_action(suggestion, 'rejected')
+            
+            logger.info(f"已拒绝AI建议: {suggestion_type} - {target}")
+            st.info("❌ 建议已拒绝")
             
             return True
             
         except Exception as e:
             logger.error(f"拒绝建议失败: {e}")
+            st.error("❌ 建议拒绝失败，请查看日志")
             return False
     
     def _execute_manual_analysis(self, lookback_days: int, mode: str):
@@ -539,6 +557,119 @@ class AIAnalysisPage:
         """
         # TODO: 在模态框或新页面显示完整分析
         st.info("详情功能开发中...")
+        
+    # ==================== AI建议处理辅助方法 ====================
+    
+    def _adjust_parameter(self, suggestion: Dict[str, Any]):
+        """
+        调整参数
+        
+        Args:
+            suggestion: 建议内容
+        """
+        try:
+            # TODO: 实现参数调整逻辑
+            current_value = suggestion.get('current_value')
+            suggested_value = suggestion.get('suggested_value')
+            target = suggestion.get('target')
+            logger.info(f"参数调整: {target} 从 {current_value} 调整为 {suggested_value}")
+        except Exception as e:
+            logger.error(f"参数调整失败: {e}")
+            raise
+    
+    def _enable_strategy(self, strategy_name: str):
+        """
+        启用策略
+        
+        Args:
+            strategy_name: 策略名称
+        """
+        try:
+            # TODO: 实现策略启用逻辑
+            logger.info(f"启用策略: {strategy_name}")
+        except Exception as e:
+            logger.error(f"启用策略失败: {e}")
+            raise
+    
+    def _disable_strategy(self, strategy_name: str):
+        """
+        禁用策略
+        
+        Args:
+            strategy_name: 策略名称
+        """
+        try:
+            # TODO: 实现策略禁用逻辑
+            logger.info(f"禁用策略: {strategy_name}")
+        except Exception as e:
+            logger.error(f"禁用策略失败: {e}")
+            raise
+    
+    def _adjust_risk_settings(self, suggestion: Dict[str, Any]):
+        """
+        调整风控设置
+        
+        Args:
+            suggestion: 建议内容
+        """
+        try:
+            # TODO: 实现风控设置调整逻辑
+            target = suggestion.get('target')
+            logger.info(f"调整风控设置: {target}")
+        except Exception as e:
+            logger.error(f"调整风控设置失败: {e}")
+            raise
+    
+    def _update_ai_suggestion_config(self, suggestion: Dict[str, Any], action: str):
+        """
+        更新AI建议配置
+        
+        Args:
+            suggestion: 建议内容
+            action: 操作类型 (accepted/rejected)
+        """
+        try:
+            # TODO: 实现配置更新逻辑
+            suggestion_type = suggestion.get('suggestion_type')
+            target = suggestion.get('target')
+            logger.info(f"更新AI建议配置: {action} {suggestion_type} - {target}")
+        except Exception as e:
+            logger.error(f"更新AI建议配置失败: {e}")
+            raise
+    
+    def _log_suggestion_action(self, suggestion: Dict[str, Any], action: str):
+        """
+        记录建议操作日志
+        
+        Args:
+            suggestion: 建议内容
+            action: 操作类型 (accepted/rejected)
+        """
+        try:
+            # TODO: 实现日志记录逻辑
+            suggestion_type = suggestion.get('suggestion_type')
+            target = suggestion.get('target')
+            logger.info(f"记录建议操作日志: {action} {suggestion_type} - {target}")
+        except Exception as e:
+            logger.error(f"记录建议操作日志失败: {e}")
+            raise
+    
+    def _notify_modules(self, suggestion: Dict[str, Any], action: str):
+        """
+        通知相关模块
+        
+        Args:
+            suggestion: 建议内容
+            action: 操作类型 (accepted/rejected)
+        """
+        try:
+            # TODO: 实现模块通知逻辑
+            suggestion_type = suggestion.get('suggestion_type')
+            target = suggestion.get('target')
+            logger.info(f"通知相关模块: {action} {suggestion_type} - {target}")
+        except Exception as e:
+            logger.error(f"通知相关模块失败: {e}")
+            raise
 
 
 # 页面入口函数

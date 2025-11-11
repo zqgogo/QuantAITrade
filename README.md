@@ -80,6 +80,14 @@ python main.py --fetch-data
 python main.py --mode hybrid
 ```
 
+### 7. 启动Web界面
+
+```bash
+streamlit run ui/app.py
+```
+
+访问: http://localhost:8501
+
 ---
 
 ## ⚙️ 配置说明

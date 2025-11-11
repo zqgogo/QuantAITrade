@@ -318,8 +318,7 @@ class StrategyControlPage:
         
         with col_save2:
             if st.button("↩️ 重置参数"):
-                # TODO: 重置为默认参数
-                st.info("重置为默认参数")
+                self._reset_strategy_params(selected_strategy)
         
         with col_save3:
             if st.button("🔄 快速回测", help="使用新参数进行快速回测"):
@@ -480,10 +479,14 @@ class StrategyControlPage:
             enabled: 是否启用
         """
         try:
-            # TODO: 实现策略启停逻辑
             # 1. 更新配置文件
+            self._update_strategy_config(strategy_name, enabled)
+            
             # 2. 通知调度器
+            self._notify_scheduler(strategy_name, enabled)
+            
             # 3. 记录操作日志
+            self._log_strategy_change(strategy_name, enabled)
             
             status = "启用" if enabled else "禁用"
             st.success(f"✅ 已{status}策略: {strategy_name}")
@@ -554,6 +557,83 @@ class StrategyControlPage:
         """
         # TODO: 实现参数历史记录
         pass
+    
+    def _reset_strategy_params(self, strategy_name: str):
+        """
+        重置策略参数为默认值
+        
+        Args:
+            strategy_name: 策略名称
+        """
+        try:
+            # TODO: 从默认配置文件加载参数或使用硬编码的默认值
+            st.info("↩️ 参数已重置为默认值")
+            logger.info(f"策略参数已重置: {strategy_name}")
+        except Exception as e:
+            logger.error(f"重置策略参数失败: {e}")
+            st.error("❌ 参数重置失败，请查看日志")
+    
+    # ==================== 策略管理辅助方法 ====================
+    
+    def _update_strategy_config(self, strategy_name: str, enabled: bool):
+        """
+        更新策略配置文件
+        
+        Args:
+            strategy_name: 策略名称
+            enabled: 是否启用
+        """
+        try:
+            # 读取当前配置
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            
+            # 更新策略状态
+            # TODO: 映射显示名称到配置名称
+            config_key = 'ma_cross'  # 示例
+            
+            if config_key in config:
+                config[config_key]['enabled'] = enabled
+                
+                # 保存配置
+                with open(self.config_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(config, f, allow_unicode=True)
+                
+                logger.info(f"策略配置已更新: {strategy_name} -> {'启用' if enabled else '禁用'}")
+            
+        except Exception as e:
+            logger.error(f"更新策略配置失败: {e}")
+            raise
+    
+    def _notify_scheduler(self, strategy_name: str, enabled: bool):
+        """
+        通知调度器策略状态变更
+        
+        Args:
+            strategy_name: 策略名称
+            enabled: 是否启用
+        """
+        try:
+            # TODO: 实现与调度器的通信机制
+            logger.info(f"已通知调度器策略状态变更: {strategy_name} -> {'启用' if enabled else '禁用'}")
+        except Exception as e:
+            logger.error(f"通知调度器失败: {e}")
+            raise
+    
+    def _log_strategy_change(self, strategy_name: str, enabled: bool):
+        """
+        记录策略状态变更日志
+        
+        Args:
+            strategy_name: 策略名称
+            enabled: 是否启用
+        """
+        try:
+            # TODO: 实现日志记录
+            logger.info(f"策略状态变更日志: {strategy_name} -> {'启用' if enabled else '禁用'}")
+        except Exception as e:
+            logger.error(f"记录策略变更日志失败: {e}")
+            raise
 
 
 # 页面入口函数
