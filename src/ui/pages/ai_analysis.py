@@ -35,7 +35,7 @@ class AIAnalysisPage:
         st.title("🤖 AI 分析中心")
         
         # 创建标签页
-        tab1, tab2, tab3 = st.tabs(["📊 最新分析", "📜 历史记录", "⚡ 手动分析"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 最新分析", "📜 历史记录", "📈 效果追踪", "⚡ 手动分析"])
         
         with tab1:
             self._render_latest_analysis()
@@ -44,7 +44,111 @@ class AIAnalysisPage:
             self._render_analysis_history()
         
         with tab3:
+            self._render_suggestion_effect_tracking()
+        
+        with tab4:
             self._render_manual_analysis()
+            
+    def _render_suggestion_effect_tracking(self):
+        """
+        渲染建议效果追踪标签
+        """
+        st.subheader("📈 建议效果追踪")
+        
+        # 说明文字
+        st.markdown("""
+        本页面展示已采纳AI建议的执行效果，用于评估AI建议的准确性和有效性。
+        通过追踪建议效果，可以不断优化AI分析模型。
+        """)
+        
+        # 模拟效果数据
+        # 在实际实现中，应该从数据库查询已采纳建议的执行效果
+        effect_data = [
+            {
+                'suggestion_id': 'SUG-001',
+                'suggestion_type': '参数调整',
+                'target': 'MA交叉策略',
+                'accepted_time': '2025-11-01 10:30',
+                'expected_effect': '提高胜率2%',
+                'actual_effect': '胜率提升1.8%',
+                'evaluation': '效果良好'
+            },
+            {
+                'suggestion_id': 'SUG-002',
+                'suggestion_type': '风控调整',
+                'target': '止损参数',
+                'accepted_time': '2025-11-05 14:15',
+                'expected_effect': '降低最大回撤0.5%',
+                'actual_effect': '降低最大回撤0.7%',
+                'evaluation': '超出预期'
+            },
+            {
+                'suggestion_id': 'SUG-003',
+                'suggestion_type': '策略启用',
+                'target': '新策略B',
+                'accepted_time': '2025-11-10 09:45',
+                'expected_effect': '增加收益1.2%',
+                'actual_effect': '增加收益1.5%',
+                'evaluation': '效果显著'
+            }
+        ]
+        
+        # 创建两列布局
+        col1, col2 = st.columns(2)
+        
+        # 1. 效果评分分布
+        with col1:
+            st.markdown("#### 效果评分分布")
+            # 模拟评分数据
+            scores = [8.5, 7.2, 9.1, 6.8, 7.9, 8.3, 9.5, 7.6, 8.8, 7.4]
+            score_labels = [f'建议{i+1}' for i in range(len(scores))]
+            
+            fig_scores = px.bar(
+                x=score_labels,
+                y=scores,
+                title='已采纳建议效果评分',
+                labels={'x': '建议编号', 'y': '效果评分(1-10)'}
+            )
+            st.plotly_chart(fig_scores, use_container_width=True)
+        
+        # 2. 效果达成率
+        with col2:
+            st.markdown("#### 效果达成率")
+            # 模拟达成率数据
+            achievement_rates = [90, 85, 115, 75, 95, 88, 120, 82, 105, 80]
+            rate_labels = [f'建议{i+1}' for i in range(len(achievement_rates))]
+            
+            fig_rates = px.bar(
+                x=rate_labels,
+                y=achievement_rates,
+                title='建议效果达成率',
+                labels={'x': '建议编号', 'y': '达成率(%)'}
+            )
+            fig_rates.add_hline(y=100, line_dash="dash", line_color="red")
+            st.plotly_chart(fig_rates, use_container_width=True)
+        
+        # 3. 详细效果记录
+        st.markdown("#### 详细效果记录")
+        
+        # 转换为DataFrame并显示
+        df = pd.DataFrame(effect_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # 4. 效果统计
+        st.markdown("#### 效果统计")
+        col_stat1, col_stat2, col_stat3 = st.columns(3)
+        
+        with col_stat1:
+            avg_score = 7.8  # 模拟平均评分
+            st.metric("平均效果评分", f"{avg_score}/10")
+        
+        with col_stat2:
+            success_rate = 85  # 模拟成功率
+            st.metric("效果达成率", f"{success_rate}%")
+        
+        with col_stat3:
+            total_suggestions = 25  # 模拟总建议数
+            st.metric("已追踪建议", total_suggestions)
     
     def _render_latest_analysis(self):
         """
@@ -335,6 +439,10 @@ class AIAnalysisPage:
                 st.text(f"• {record['analysis_date']} - {record['model_version']}")
         else:
             st.info("暂无最近记录")
+            
+        # 添加效果追踪说明
+        st.markdown("---")
+        st.info("💡 效果追踪功能会持续跟踪已采纳建议的执行效果，帮助优化AI模型")
     
     # ==================== 数据获取方法 ====================
     

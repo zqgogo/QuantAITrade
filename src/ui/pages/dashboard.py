@@ -246,43 +246,126 @@ class DashboardPage:
     
     def _render_strategy_performance(self):
         """
-        渲染策略绩效分析（预留功能）
+        渲染策略绩效分析
         
-        计划实现：
+        实现功能：
         - 各策略收益对比
         - 策略信号统计
         - 策略胜率分析
         """
         st.markdown("### 📊 策略绩效对比")
         
-        # TODO: 从数据库获取策略绩效数据
-        st.info("🚧 策略绩效分析功能开发中...")
+        # 从数据库获取策略绩效数据
+        strategy_stats = self._get_strategy_performance()
         
-        # 预留图表位置
-        # 示例代码（待实现）：
-        # strategy_stats = self._get_strategy_performance()
-        # fig = px.bar(strategy_stats, x='strategy', y='return', title='各策略收益对比')
-        # st.plotly_chart(fig, use_container_width=True)
+        if strategy_stats.empty:
+            st.info("💡 暂无策略绩效数据")
+            return
+        
+        # 创建两列布局
+        col1, col2 = st.columns(2)
+        
+        # 1. 收益对比柱状图
+        with col1:
+            st.markdown("#### 收益对比")
+            fig_return = px.bar(
+                strategy_stats, 
+                x='strategy_name', 
+                y='total_return', 
+                title='各策略收益对比',
+                labels={'strategy_name': '策略名称', 'total_return': '总收益(%)'}
+            )
+            st.plotly_chart(fig_return, use_container_width=True)
+        
+        # 2. 胜率对比柱状图
+        with col2:
+            st.markdown("#### 胜率对比")
+            fig_win_rate = px.bar(
+                strategy_stats, 
+                x='strategy_name', 
+                y='win_rate', 
+                title='各策略胜率对比',
+                labels={'strategy_name': '策略名称', 'win_rate': '胜率(%)'}
+            )
+            st.plotly_chart(fig_win_rate, use_container_width=True)
+        
+        # 3. 信号数量饼图
+        st.markdown("#### 信号分布")
+        fig_signals = px.pie(
+            strategy_stats, 
+            values='signal_count', 
+            names='strategy_name', 
+            title='各策略信号数量分布'
+        )
+        st.plotly_chart(fig_signals, use_container_width=True)
+        
+        # 4. 数据表格
+        st.markdown("#### 详细数据")
+        st.dataframe(strategy_stats, use_container_width=True)
     
     def _render_equity_curve(self):
         """
-        渲染资产曲线图（预留功能）
+        渲染资产曲线图
         
-        计划实现：
+        实现功能：
         - 账户权益历史曲线
         - 回撤区域标注
         - 关键事件标记
         """
         st.markdown("### 💰 账户权益曲线")
         
-        # TODO: 实现权益曲线计算
-        st.info("🚧 权益曲线功能开发中...")
+        # 计算权益曲线
+        equity_data = self._calculate_equity_curve()
         
-        # 预留图表代码：
-        # equity_data = self._calculate_equity_curve()
-        # fig = go.Figure()
-        # fig.add_trace(go.Scatter(x=equity_data['date'], y=equity_data['equity'], name='权益'))
-        # st.plotly_chart(fig, use_container_width=True)
+        if equity_data.empty:
+            st.info("💡 暂无权益曲线数据")
+            return
+        
+        # 创建图表
+        fig = go.Figure()
+        
+        # 添加权益曲线
+        fig.add_trace(
+            go.Scatter(
+                x=equity_data['date'], 
+                y=equity_data['equity'], 
+                mode='lines',
+                name='账户权益',
+                line=dict(color='blue')
+            )
+        )
+        
+        # 添加回撤曲线
+        fig.add_trace(
+            go.Scatter(
+                x=equity_data['date'], 
+                y=equity_data['drawdown'], 
+                mode='lines',
+                name='回撤(%)',
+                line=dict(color='red'),
+                yaxis='y2'
+            )
+        )
+        
+        # 设置图表布局
+        fig.update_layout(
+            title='账户权益与回撤曲线',
+            xaxis_title='日期',
+            yaxis_title='账户权益',
+            yaxis2=dict(
+                title='回撤(%)',
+                overlaying='y',
+                side='right'
+            ),
+            legend=dict(x=0, y=1)
+        )
+        
+        # 显示图表
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 显示数据表格
+        st.markdown("#### 详细数据")
+        st.dataframe(equity_data, use_container_width=True)
     
     # ==================== 数据获取方法 ====================
     

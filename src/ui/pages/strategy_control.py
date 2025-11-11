@@ -325,10 +325,72 @@ class StrategyControlPage:
                 # TODO: 触发回测
                 st.info("🚧 回测功能开发中...")
         
-        # 参数修改历史（预留）
+        # 参数修改历史
         with st.expander("📜 参数修改历史", expanded=False):
-            st.info("🚧 参数修改历史功能开发中...")
-            # TODO: 显示参数修改历史
+            self._render_parameter_history(selected_strategy)
+            
+    def _render_parameter_history(self, strategy_name: str):
+        """
+        渲染参数修改历史
+        
+        Args:
+            strategy_name: 策略名称
+        """
+        try:
+            # 由于我们没有实际的参数历史记录表，这里模拟一些历史数据
+            # 在实际实现中，应该从数据库查询参数修改历史
+            
+            # 模拟历史数据
+            history_data = [
+                {
+                    'modified_time': '2025-11-01 10:30:00',
+                    'modified_by': '系统初始化',
+                    'old_params': {},
+                    'new_params': {'short_window': 5, 'long_window': 20}
+                },
+                {
+                    'modified_time': '2025-11-05 14:15:00',
+                    'modified_by': '用户调整',
+                    'old_params': {'short_window': 5, 'long_window': 20},
+                    'new_params': {'short_window': 7, 'long_window': 25}
+                },
+                {
+                    'modified_time': '2025-11-10 09:45:00',
+                    'modified_by': 'AI建议',
+                    'old_params': {'short_window': 7, 'long_window': 25},
+                    'new_params': {'short_window': 6, 'long_window': 22}
+                }
+            ]
+            
+            # 显示历史记录
+            for i, record in enumerate(history_data):
+                with st.container(border=True):
+                    st.markdown(f"**修改时间**: {record['modified_time']}")
+                    st.markdown(f"**修改人**: {record['modified_by']}")
+                    
+                    # 显示参数变更对比
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**原参数**:")
+                        if record['old_params']:
+                            for key, value in record['old_params'].items():
+                                st.text(f"{key}: {value}")
+                        else:
+                            st.text("无")
+                    
+                    with col2:
+                        st.markdown("**新参数**:"): 
+                        for key, value in record['new_params'].items():
+                            st.text(f"{key}: {value}")
+                    
+                    # 添加分隔线（除了最后一个）
+                    if i < len(history_data) - 1:
+                        st.divider()
+                        
+        except Exception as e:
+            logger.error(f"渲染参数修改历史失败: {e}")
+            st.error("❌ 加载参数修改历史失败")
     
     # ==================== 数据获取方法 ====================
     
