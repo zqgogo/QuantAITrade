@@ -11,8 +11,8 @@ from loguru import logger
 from data.db_manager import db_manager
 from utils.state_manager import state_manager
 from utils.signal_queue_manager import signal_queue_manager
-from execution.order_manager import order_manager
-from execution.position_tracker import position_tracker
+from src.execution.order_manager import order_manager
+from src.execution.position_tracker import position_tracker
 from data.fetcher import DataFetcher
 
 

@@ -12,16 +12,18 @@ from pathlib import Path
 from datetime import datetime
 from loguru import logger
 
-# 添加项目根目录到Python路径
+# 添加项目根目录和src目录到Python路径
 project_root = Path(__file__).parent
+src_path = project_root / "src"
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(src_path))
 
 from config import get_config, LOG_DIRECTORY
 from data.db_manager import db_manager
 from data.fetcher import data_fetcher
-from execution.trade_executor import trade_executor
-from execution.exchange_connector import exchange_connector
-from execution.position_tracker import position_tracker
+from src.execution.trade_executor import trade_executor
+from src.execution.exchange_connector import exchange_connector
+from src.execution.position_tracker import position_tracker
 from orchestrator.scheduler import scheduler
 from strategy import MACrossStrategy
 from ai.ai_analyzer import ai_analyzer

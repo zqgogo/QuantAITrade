@@ -10,7 +10,7 @@ from datetime import datetime
 
 from data.models import Position, Order, OrderSide, StopLossType
 from data.db_manager import db_manager
-from execution.exchange_connector import exchange_connector
+from .exchange_connector import exchange_connector
 from config import get_config
 
 

@@ -10,8 +10,8 @@ from datetime import datetime
 
 from data.models import Signal, Order, OrderSide, OrderType, OrderStatus, Position
 from data.db_manager import db_manager
-from execution.exchange_connector import exchange_connector
-from execution.risk_controller import risk_controller
+from .exchange_connector import exchange_connector
+from .risk_controller import risk_controller
 from config import get_config
 
 

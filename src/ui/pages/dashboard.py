@@ -12,8 +12,8 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from data.db_manager import db_manager
-from execution.exchange_connector import exchange_connector
-from execution.position_tracker import position_tracker
+from src.execution.exchange_connector import exchange_connector
+from src.execution.position_tracker import position_tracker
 
 
 class DashboardPage:

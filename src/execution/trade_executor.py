@@ -13,14 +13,14 @@ from datetime import datetime
 
 from data.models import Signal, Order, Position, SignalType
 from data.db_manager import db_manager
-from execution.order_manager import order_manager
-from execution.position_tracker import position_tracker
-from execution.exchange_connector import exchange_connector
-from execution.risk_controller import risk_controller
+from .order_manager import order_manager
+from .position_tracker import position_tracker
+from .exchange_connector import exchange_connector
+from .risk_controller import risk_controller
 from config import get_config
 
 # 导入信号队列管理器
-from utils.signal_queue_manager import signal_queue_manager
+from src.utils.signal_queue_manager import signal_queue_manager
 
 
 @dataclass(order=True)

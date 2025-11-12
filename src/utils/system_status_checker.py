@@ -10,7 +10,7 @@ from loguru import logger
 
 try:
     from data.db_manager import db_manager
-    from execution.exchange_connector import exchange_connector
+    from src.execution.exchange_connector import exchange_connector
     from orchestrator.scheduler import scheduler
     HAS_EXTERNAL_DEPENDENCIES = True
 except ImportError as e:
