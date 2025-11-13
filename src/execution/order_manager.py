@@ -36,7 +36,7 @@ class OrderManager:
             signal: 策略信号
             account_balance: 账户余额（USDT）
             positions: 当前持仓列表
-        
+            
         Returns:
             Order: 创建的订单，失败返回 None
         """
@@ -44,26 +44,34 @@ class OrderManager:
             logger.info(f"开始处理交易信号: {signal.strategy_name} - {signal.symbol} {signal.signal_type.value}")
             
             # 1. 风控检查
-            passed, reason, stop_loss_price = risk_controller.check_order_risk(
-                signal=signal,
-                account_balance=account_balance,
-                current_positions=positions
-            )
-            
-            if not passed:
-                logger.warning(f"风控检查未通过: {reason}")
-                # 记录拒绝日志到数据库
-                self._log_rejected_signal(signal, reason)
+            try:
+                passed, reason = risk_controller.check_order_risk(
+                    signal=signal,
+                    account_balance=account_balance,
+                    current_positions=positions
+                )
+                
+                if not passed:
+                    logger.warning(f"风控检查未通过: {reason}")
+                    # 记录拒绝日志到数据库
+                    self._log_rejected_signal(signal, reason)
+                    return None
+                
+                logger.info(f"风控检查通过")
+            except Exception as e:
+                logger.error(f"风控检查异常: {e}")
                 return None
             
-            logger.info(f"风控检查通过 - 止损价: {stop_loss_price}")
-            
             # 2. 计算订单数量
-            quantity = self._calculate_order_quantity(
-                signal=signal,
-                account_balance=account_balance,
-                current_price=signal.price
-            )
+            try:
+                quantity = self._calculate_order_quantity(
+                    signal=signal,
+                    account_balance=account_balance,
+                    current_price=signal.price
+                )
+            except Exception as e:
+                logger.error(f"计算订单数量异常: {e}")
+                quantity = None
             
             if quantity is None or quantity <= 0:
                 logger.error("订单数量计算失败")
@@ -72,7 +80,7 @@ class OrderManager:
             logger.info(f"计算订单数量: {quantity} (价格: {signal.price}, 置信度: {signal.confidence})")
             
             # 3. 创建订单对象
-            order_side = OrderSide.BUY if signal.signal_type.value == "BUY" else OrderSide.SELL
+            order_side = OrderSide.BUY if signal.signal_type == SignalType.BUY else OrderSide.SELL
             
             order = Order(
                 symbol=signal.symbol,
@@ -80,7 +88,8 @@ class OrderManager:
                 order_type=OrderType.MARKET,  # 默认使用市价单
                 quantity=quantity,
                 price=signal.price,  # 预期价格
-                status=OrderStatus.NEW
+                status=OrderStatus.NEW,
+                strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else 'Unknown'
             )
             
             return order
@@ -95,7 +104,7 @@ class OrderManager:
         
         Args:
             order: 订单对象
-        
+            
         Returns:
             bool: 是否成功
         """
@@ -140,7 +149,10 @@ class OrderManager:
             order.price = result.price  # 更新为实际成交价
             
             # 保存订单到数据库
-            self._save_order_to_db(order)
+            try:
+                self._save_order_to_db(order)
+            except Exception as e:
+                logger.error(f"保存订单到数据库失败: {e}")
             
             logger.success(f"订单提交成功: {order.order_id} - {order.symbol} {order.side.value} {order.quantity}")
             return True
@@ -156,7 +168,7 @@ class OrderManager:
         Args:
             symbol: 交易对
             order_id: 订单ID
-        
+            
         Returns:
             bool: 是否成功
         """
@@ -167,12 +179,15 @@ class OrderManager:
                 # 更新数据库中的订单状态
                 conn = db_manager.get_connection()
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE trade_records SET status = ? WHERE order_id = ?",
-                    (OrderStatus.CANCELED.value, order_id)
-                )
-                conn.commit()
-                logger.info(f"订单撤销成功: {order_id}")
+                try:
+                    cursor.execute(
+                        "UPDATE trade_records SET status = ? WHERE order_id = ?",
+                        (OrderStatus.CANCELED.value, order_id)
+                    )
+                    conn.commit()
+                    logger.info(f"订单撤销成功: {order_id}")
+                except Exception as e:
+                    logger.error(f"更新数据库订单状态失败: {e}")
             
             return success
             
@@ -186,7 +201,7 @@ class OrderManager:
         
         Args:
             order_id: 订单ID
-        
+            
         Returns:
             dict: 订单信息
         """
@@ -217,7 +232,7 @@ class OrderManager:
         Args:
             symbol: 交易对，None 表示所有交易对
             limit: 数量限制
-        
+            
         Returns:
             List[dict]: 订单列表
         """
@@ -259,7 +274,7 @@ class OrderManager:
         Args:
             symbol: 交易对
             order_id: 订单ID
-        
+            
         Returns:
             OrderStatus: 订单状态
         """
@@ -270,12 +285,15 @@ class OrderManager:
                 # 更新数据库
                 conn = db_manager.get_connection()
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE trade_records SET status = ? WHERE order_id = ?",
-                    (status.value, order_id)
-                )
-                conn.commit()
-                logger.debug(f"订单状态已同步: {order_id} - {status.value}")
+                try:
+                    cursor.execute(
+                        "UPDATE trade_records SET status = ? WHERE order_id = ?",
+                        (status.value, order_id)
+                    )
+                    conn.commit()
+                    logger.debug(f"订单状态已同步: {order_id} - {status.value}")
+                except Exception as e:
+                    logger.error(f"更新数据库订单状态失败: {e}")
             
             return status
             
@@ -296,7 +314,7 @@ class OrderManager:
             signal: 交易信号
             account_balance: 账户余额
             current_price: 当前价格
-        
+            
         Returns:
             float: 订单数量
         """
@@ -313,9 +331,17 @@ class OrderManager:
             # 根据信号置信度调整
             adjusted_quantity = base_quantity * signal.confidence
             
-            # 精度处理（币安 BTC 精度为 5 位小数）
-            # 这里简化处理，实际应根据交易对配置
-            quantity = round(adjusted_quantity, 5)
+            # 根据交易对设置精度
+            symbol = signal.symbol
+            if symbol.endswith('USDT'):
+                # USDT交易对通常精度为小数点后2-5位
+                quantity = round(adjusted_quantity, 5)
+            elif symbol.endswith('BTC'):
+                # BTC交易对通常精度为小数点后5-8位
+                quantity = round(adjusted_quantity, 8)
+            else:
+                # 默认精度
+                quantity = round(adjusted_quantity, 5)
             
             # 检查最小订单量（以 BTC 为例，最小 0.00001）
             min_quantity = 0.00001
@@ -345,8 +371,8 @@ class OrderManager:
             cursor.execute(
                 """
                 INSERT INTO trade_records 
-                (symbol, side, order_type, price, quantity, status, order_id, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (symbol, side, order_type, price, quantity, status, order_id, strategy_name, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     order.symbol,
@@ -356,6 +382,7 @@ class OrderManager:
                     order.quantity,
                     order.status.value,
                     order.order_id,
+                    order.strategy_name,
                     order.created_time
                 )
             )

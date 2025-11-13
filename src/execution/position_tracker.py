@@ -38,7 +38,7 @@ class PositionTracker:
             order: 开仓订单
             stop_loss_price: 止损价格
             stop_loss_type: 止损类型
-        
+            
         Returns:
             bool: 是否成功
         """
@@ -70,7 +70,7 @@ class PositionTracker:
                     order.symbol,
                     order.price,
                     order.quantity,
-                    "Unknown",  # 策略名需要从 order 中传递
+                    order.strategy_name if hasattr(order, 'strategy_name') else "Unknown",  # 策略名需要从 order 中传递
                     stop_loss_type.value,
                     stop_loss_price,
                     stop_loss_price,
@@ -99,7 +99,7 @@ class PositionTracker:
             position_id: 持仓ID
             close_price: 平仓价格
             reason: 平仓原因
-        
+            
         Returns:
             bool: 是否成功
         """
@@ -167,7 +167,7 @@ class PositionTracker:
         Args:
             position_id: 持仓ID
             current_price: 当前价格
-        
+            
         Returns:
             bool: 是否成功
         """
@@ -255,7 +255,7 @@ class PositionTracker:
         
         Args:
             status: 持仓状态 ('OPEN' / 'CLOSED')
-        
+            
         Returns:
             List[Position]: 持仓列表
         """
@@ -272,21 +272,25 @@ class PositionTracker:
             positions = []
             
             for row in rows:
-                data = dict(row)
-                position = Position(
-                    symbol=data['symbol'],
-                    entry_price=data['entry_price'],
-                    quantity=data['quantity'],
-                    strategy_name=data['strategy_name'],
-                    stop_loss_type=StopLossType(data['stop_loss_type']),
-                    stop_loss_price=data['stop_loss_price'],
-                    initial_stop_price=data['initial_stop_price'],
-                    highest_price=data['highest_price'],
-                    entry_time=data['entry_time'],
-                    unrealized_pnl=data.get('unrealized_pnl', 0.0),
-                    unrealized_pnl_percent=data.get('unrealized_pnl_percent', 0.0)
-                )
-                positions.append(position)
+                try:
+                    data = dict(row)
+                    position = Position(
+                        symbol=data['symbol'],
+                        entry_price=data['entry_price'],
+                        quantity=data['quantity'],
+                        strategy_name=data['strategy_name'],
+                        stop_loss_type=StopLossType(data['stop_loss_type']),
+                        stop_loss_price=data['stop_loss_price'],
+                        initial_stop_price=data['initial_stop_price'],
+                        highest_price=data['highest_price'],
+                        entry_time=data['entry_time'],
+                        unrealized_pnl=data.get('unrealized_pnl', 0.0),
+                        unrealized_pnl_percent=data.get('unrealized_pnl_percent', 0.0)
+                    )
+                    positions.append(position)
+                except Exception as e:
+                    logger.error(f"转换持仓数据失败: {e}")
+                    continue
             
             return positions
             
@@ -300,7 +304,7 @@ class PositionTracker:
         
         Args:
             symbol: 交易对
-        
+            
         Returns:
             dict: 持仓信息
         """
@@ -345,47 +349,54 @@ class PositionTracker:
             current_prices = {}
             for position in positions:
                 if position.symbol not in current_prices:
-                    price = exchange_connector.get_current_price(position.symbol)
-                    if price:
-                        current_prices[position.symbol] = price
+                    try:
+                        price = exchange_connector.get_current_price(position.symbol)
+                        if price:
+                            current_prices[position.symbol] = price
+                    except Exception as e:
+                        logger.error(f"获取 {position.symbol} 价格失败: {e}")
             
             # 检查每个持仓
             for position in positions:
-                symbol = position.symbol
-                if symbol not in current_prices:
-                    logger.warning(f"无法获取 {symbol} 的当前价格，跳过止损检查")
-                    continue
-                
-                current_price = current_prices[symbol]
-                
-                # 先更新持仓数据
-                position_data = self.get_position(symbol)
-                if position_data:
-                    self.update_position(position_data['id'], current_price)
+                try:
+                    symbol = position.symbol
+                    if symbol not in current_prices:
+                        logger.warning(f"无法获取 {symbol} 的当前价格，跳过止损检查")
+                        continue
                     
-                    # 重新获取更新后的止损价
-                    updated_position = self.get_position(symbol)
-                    if updated_position:
-                        stop_loss_price = updated_position['stop_loss_price']
+                    current_price = current_prices[symbol]
+                    
+                    # 先更新持仓数据
+                    position_data = self.get_position(symbol)
+                    if position_data:
+                        self.update_position(position_data['id'], current_price)
                         
-                        # 检查是否触发止损
-                        if self._check_stop_loss_trigger(
-                            position, 
-                            current_price, 
-                            stop_loss_price
-                        ):
-                            reason = self._get_stop_loss_reason(position, current_price)
-                            triggered_positions.append((
-                                updated_position['id'], 
-                                symbol, 
-                                reason
-                            ))
+                        # 重新获取更新后的止损价
+                        updated_position = self.get_position(symbol)
+                        if updated_position:
+                            stop_loss_price = updated_position['stop_loss_price']
                             
-                            logger.warning(
-                                f"止损触发: {symbol} - "
-                                f"当前价: {current_price}, 止损价: {stop_loss_price}, "
-                                f"原因: {reason}"
-                            )
+                            # 检查是否触发止损
+                            if self._check_stop_loss_trigger(
+                                position, 
+                                current_price, 
+                                stop_loss_price
+                            ):
+                                reason = self._get_stop_loss_reason(position, current_price)
+                                triggered_positions.append((
+                                    updated_position['id'], 
+                                    symbol, 
+                                    reason
+                                ))
+                                
+                                logger.warning(
+                                    f"止损触发: {symbol} - "
+                                    f"当前价: {current_price}, 止损价: {stop_loss_price}, "
+                                    f"原因: {reason}"
+                                )
+                except Exception as e:
+                    logger.error(f"检查持仓 {position.symbol} 止损失败: {e}")
+                    # 继续处理其他持仓
             
             return triggered_positions
             
@@ -400,11 +411,15 @@ class PositionTracker:
         Args:
             position: 持仓对象
             current_price: 当前价格
-        
+            
         Returns:
             float: 浮动盈亏金额
         """
-        return (current_price - position.entry_price) * position.quantity
+        try:
+            return (current_price - position.entry_price) * position.quantity
+        except Exception as e:
+            logger.error(f"计算浮动盈亏失败: {e}")
+            return 0.0
     
     def _check_stop_loss_trigger(
         self, 
@@ -419,27 +434,31 @@ class PositionTracker:
             position: 持仓对象
             current_price: 当前价格
             stop_loss_price: 止损价格
-        
+            
         Returns:
             bool: 是否触发止损
         """
-        # 固定百分比、关键点位、ATR、移动止损
-        if position.stop_loss_type in [
-            StopLossType.FIXED_PERCENT,
-            StopLossType.KEY_LEVEL,
-            StopLossType.ATR_BASED,
-            StopLossType.TRAILING
-        ]:
-            return current_price <= stop_loss_price
-        
-        # 时间止损
-        elif position.stop_loss_type == StopLossType.TIME_BASED:
-            current_time = int(time.time())
-            holding_days = (current_time - position.entry_time) / 86400  # 转换为天数
-            max_holding_days = self.risk_config.get('max_holding_days', 30)
-            return holding_days >= max_holding_days
-        
-        return False
+        try:
+            # 固定百分比、关键点位、ATR、移动止损
+            if position.stop_loss_type in [
+                StopLossType.FIXED_PERCENT,
+                StopLossType.KEY_LEVEL,
+                StopLossType.ATR_BASED,
+                StopLossType.TRAILING
+            ]:
+                return current_price <= stop_loss_price
+            
+            # 时间止损
+            elif position.stop_loss_type == StopLossType.TIME_BASED:
+                current_time = int(time.time())
+                holding_days = (current_time - position.entry_time) / 86400  # 转换为天数
+                max_holding_days = self.risk_config.get('max_holding_days', 30)
+                return holding_days >= max_holding_days
+            
+            return False
+        except Exception as e:
+            logger.error(f"检查止损触发失败: {e}")
+            return False
     
     def _get_stop_loss_reason(self, position: Position, current_price: float) -> str:
         """
@@ -448,32 +467,49 @@ class PositionTracker:
         Args:
             position: 持仓对象
             current_price: 当前价格
-        
+            
         Returns:
             str: 止损原因
         """
-        if position.stop_loss_type == StopLossType.FIXED_PERCENT:
-            loss_percent = (current_price / position.entry_price - 1) * 100
-            return f"固定百分比止损 ({loss_percent:.2f}%)"
+        try:
+            if position.stop_loss_type == StopLossType.FIXED_PERCENT:
+                loss_percent = (current_price / position.entry_price - 1) * 100
+                return f"固定百分比止损 ({loss_percent:.2f}%)"
+            
+            elif position.stop_loss_type == StopLossType.KEY_LEVEL:
+                return f"跌破关键支撑位 {position.stop_loss_price}"
+            
+            elif position.stop_loss_type == StopLossType.ATR_BASED:
+                return "ATR 动态止损触发"
+            
+            elif position.stop_loss_type == StopLossType.TRAILING:
+                return f"移动止损触发 (最高价: {position.highest_price})"
+            
+            elif position.stop_loss_type == StopLossType.TIME_BASED:
+                holding_days = (int(time.time()) - position.entry_time) / 86400
+                return f"时间止损 (持仓 {holding_days:.1f} 天)"
+            
+            elif position.stop_loss_type == StopLossType.MANUAL:
+                return "手动止损"
+            
+            return "未知原因"
+        except Exception as e:
+            logger.error(f"获取止损原因失败: {e}")
+            return "未知原因"
+    
+    def recover_position(self, position_data: Dict[str, Any]):
+        """
+        恢复持仓（用于系统恢复）
         
-        elif position.stop_loss_type == StopLossType.KEY_LEVEL:
-            return f"跌破关键支撑位 {position.stop_loss_price}"
-        
-        elif position.stop_loss_type == StopLossType.ATR_BASED:
-            return "ATR 动态止损触发"
-        
-        elif position.stop_loss_type == StopLossType.TRAILING:
-            return f"移动止损触发 (最高价: {position.highest_price})"
-        
-        elif position.stop_loss_type == StopLossType.TIME_BASED:
-            holding_days = (int(time.time()) - position.entry_time) / 86400
-            return f"时间止损 (持仓 {holding_days:.1f} 天)"
-        
-        elif position.stop_loss_type == StopLossType.MANUAL:
-            return "手动止损"
-        
-        return "未知原因"
-
+        Args:
+            position_data: 持仓数据
+        """
+        try:
+            # 这里可以实现具体的持仓恢复逻辑
+            # 目前只是记录日志
+            logger.info(f"恢复持仓: {position_data['symbol']} @ {position_data['entry_price']}")
+        except Exception as e:
+            logger.error(f"恢复持仓失败: {e}")
 
 # 全局实例
 position_tracker = PositionTracker()

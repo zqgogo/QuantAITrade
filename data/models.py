@@ -220,6 +220,7 @@ class Order:
     status: OrderStatus = OrderStatus.NEW
     created_time: int = field(default_factory=lambda: int(datetime.now().timestamp()))
     updated_time: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+    strategy_name: str = "Unknown"  # 添加策略名称字段
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -234,5 +235,6 @@ class Order:
             'executed_qty': self.executed_qty,
             'status': self.status.value,
             'created_time': self.created_time,
-            'updated_time': self.updated_time
+            'updated_time': self.updated_time,
+            'strategy_name': self.strategy_name
         }

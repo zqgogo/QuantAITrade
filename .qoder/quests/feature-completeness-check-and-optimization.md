@@ -109,7 +109,7 @@
 ```
 
 此外，项目运行过程中会产生以下类型的文件：
-1. 数据库文件（runtime/data/kline.db）
+1. 数据库文件（data/kline.db）
 2. 日志文件（runtime/logs/目录）
 3. 缓存文件（runtime/cache/目录）
 4. 临时文件（runtime/tmp/目录）
@@ -153,11 +153,11 @@
 ├── resources/           # 资源文件目录
 │   └── static/          # 静态资源
 ├── runtime/             # 运行时数据目录
-│   ├── data/            # 数据库文件
 │   ├── logs/            # 日志文件
 │   ├── tmp/             # 临时文件
 │   └── cache/           # 缓存文件
-├── data/                # 生成的数据文件目录
+├── data/                # 数据文件目录
+│   ├── kline.db         # 数据库文件
 │   └── analysis/        # 分析结果文件
 │       ├── backtest/    # 回测结果
 │       ├── strategy/    # 策略分析报告
@@ -364,7 +364,7 @@
    - 创建`docs/`和`tests/`目录
 
 2. **文件迁移**
-   - 将`data/kline.db`移动到`runtime/data/kline.db`
+   - 将`data/kline.db`保持在`data/kline.db`（已独立）
    - 将日志文件存储到`runtime/logs/`目录
    - 在`data/`目录下创建`analysis/`子目录用于存放分析结果
 
@@ -375,7 +375,7 @@
    - 修改`config/settings.py`中的数据库路径和日志路径获取逻辑
 
 2. **数据库路径更新**
-   - 修改`data/db_manager.py`中的数据库文件路径
+   - 确认`data/db_manager.py`中的数据库文件路径正确指向`data/kline.db`
 
 3. **日志配置更新**
    - 修改`main.py`中的日志配置，将日志输出到`runtime/logs/`目录

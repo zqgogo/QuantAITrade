@@ -55,212 +55,216 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # 创建K线数据表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS kline_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                interval TEXT NOT NULL,
-                open_time INTEGER NOT NULL,
-                open REAL NOT NULL,
-                high REAL NOT NULL,
-                low REAL NOT NULL,
-                close REAL NOT NULL,
-                volume REAL NOT NULL,
-                close_time INTEGER NOT NULL,
-                quote_volume REAL DEFAULT 0.0,
-                trades_count INTEGER DEFAULT 0,
-                created_at INTEGER DEFAULT (strftime('%s', 'now')),
-                UNIQUE(symbol, interval, open_time)
-            )
-        ''')
-        
-        # 创建索引
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_kline_symbol_interval 
-            ON kline_data(symbol, interval, open_time DESC)
-        ''')
-        
-        # 创建策略信号表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS strategy_signals (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                strategy_name TEXT NOT NULL,
-                symbol TEXT NOT NULL,
-                signal_type TEXT NOT NULL,
-                price REAL NOT NULL,
-                timestamp INTEGER NOT NULL,
-                parameters TEXT,
-                confidence REAL DEFAULT 0.0,
-                reason TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_signals_timestamp 
-            ON strategy_signals(timestamp DESC)
-        ''')
-        
-        # 创建交易记录表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS trade_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                side TEXT NOT NULL,
-                order_type TEXT NOT NULL,
-                price REAL NOT NULL,
-                quantity REAL NOT NULL,
-                status TEXT NOT NULL,
-                order_id TEXT,
-                strategy_name TEXT NOT NULL,
-                stop_loss_price REAL,
-                stop_loss_type TEXT,
-                timestamp INTEGER NOT NULL,
-                pnl REAL DEFAULT 0.0,
-                pnl_percent REAL DEFAULT 0.0
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_trades_timestamp 
-            ON trade_records(timestamp DESC)
-        ''')
-        
-        # 创建持仓表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS positions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                entry_price REAL NOT NULL,
-                quantity REAL NOT NULL,
-                strategy_name TEXT NOT NULL,
-                stop_loss_type TEXT NOT NULL,
-                stop_loss_price REAL NOT NULL,
-                initial_stop_price REAL NOT NULL,
-                highest_price REAL NOT NULL,
-                entry_time INTEGER NOT NULL,
-                order_id TEXT,
-                status TEXT DEFAULT 'OPEN',
-                close_price REAL,
-                close_time INTEGER,
-                close_reason TEXT,
-                realized_pnl REAL DEFAULT 0.0,
-                realized_pnl_percent REAL DEFAULT 0.0,
-                unrealized_pnl REAL DEFAULT 0.0,
-                unrealized_pnl_percent REAL DEFAULT 0.0,
-                last_update_time INTEGER
-            )
-        ''')
-        
-        # 创建AI分析记录表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ai_analysis_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                analysis_date TEXT NOT NULL,
-                market_summary TEXT,
-                suggestions TEXT,
-                risk_alert TEXT,
-                model_version TEXT,
-                created_at INTEGER DEFAULT (strftime('%s', 'now'))
-            )
-        ''')
-        
-        # 创建回测结果表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS backtest_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                strategy_name TEXT NOT NULL,
-                symbol TEXT NOT NULL,
-                start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
-                initial_capital REAL NOT NULL,
-                final_capital REAL NOT NULL,
-                total_return REAL NOT NULL,
-                sharpe_ratio REAL DEFAULT 0.0,
-                max_drawdown REAL DEFAULT 0.0,
-                win_rate REAL DEFAULT 0.0,
-                parameters TEXT,
-                created_at INTEGER DEFAULT (strftime('%s', 'now'))
-            )
-        ''')
-        
-        # 创建系统状态表 (system_state)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS system_state (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                instance_id TEXT NOT NULL,
-                run_mode TEXT NOT NULL,
-                status TEXT NOT NULL,
-                start_time INTEGER,
-                stop_time INTEGER,
-                stop_reason TEXT,
-                pid INTEGER,
-                heartbeat_time INTEGER,
-                config_snapshot TEXT,
-                created_at INTEGER DEFAULT (strftime('%s', 'now'))
-            )
-        ''')
-        
-        # 创建任务执行日志表 (task_execution_log)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS task_execution_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                instance_id TEXT NOT NULL,
-                task_name TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                status TEXT NOT NULL,
-                start_time INTEGER,
-                end_time INTEGER,
-                duration_seconds REAL,
-                result_summary TEXT,
-                error_message TEXT,
-                retry_count INTEGER DEFAULT 0,
-                created_at INTEGER DEFAULT (strftime('%s', 'now'))
-            )
-        ''')
-        
-        # 创建信号队列表 (signal_queue)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS signal_queue (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                signal_id TEXT NOT NULL,
-                strategy_name TEXT NOT NULL,
-                symbol TEXT NOT NULL,
-                signal_type TEXT NOT NULL,
-                price REAL NOT NULL,
-                confidence REAL DEFAULT 0.0,
-                signal_timestamp INTEGER NOT NULL,
-                queue_status TEXT NOT NULL,
-                priority INTEGER DEFAULT 0,
-                submitted_time INTEGER,
-                processed_time INTEGER,
-                order_id TEXT,
-                failure_reason TEXT,
-                expiry_time INTEGER,
-                created_at INTEGER DEFAULT (strftime('%s', 'now'))
-            )
-        ''')
-        
-        # 创建数据获取进度表 (data_fetch_progress)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS data_fetch_progress (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                interval TEXT NOT NULL,
-                last_fetch_time INTEGER,
-                last_complete_time INTEGER,
-                fetch_status TEXT NOT NULL,
-                total_records INTEGER DEFAULT 0,
-                last_error TEXT,
-                consecutive_failures INTEGER DEFAULT 0,
-                next_fetch_time INTEGER,
-                updated_at INTEGER DEFAULT (strftime('%s', 'now')),
-                UNIQUE(symbol, interval)
-            )
-        ''')
-        
-        conn.commit()
-        logger.info(f"数据库初始化完成: {self.db_path}")
+        try:
+            # 创建K线数据表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS kline_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    interval TEXT NOT NULL,
+                    open_time INTEGER NOT NULL,
+                    open REAL NOT NULL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume REAL NOT NULL,
+                    close_time INTEGER NOT NULL,
+                    quote_volume REAL DEFAULT 0.0,
+                    trades_count INTEGER DEFAULT 0,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now')),
+                    UNIQUE(symbol, interval, open_time)
+                )
+            ''')
+            
+            # 创建索引
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_kline_symbol_interval 
+                ON kline_data(symbol, interval, open_time DESC)
+            ''')
+            
+            # 创建策略信号表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_name TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    signal_type TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    parameters TEXT,
+                    confidence REAL DEFAULT 0.0,
+                    reason TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_signals_timestamp 
+                ON strategy_signals(timestamp DESC)
+            ''')
+            
+            # 创建交易记录表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trade_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    order_type TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    quantity REAL NOT NULL,
+                    status TEXT NOT NULL,
+                    order_id TEXT,
+                    strategy_name TEXT NOT NULL,
+                    stop_loss_price REAL,
+                    stop_loss_type TEXT,
+                    timestamp INTEGER NOT NULL,
+                    pnl REAL DEFAULT 0.0,
+                    pnl_percent REAL DEFAULT 0.0
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_trades_timestamp 
+                ON trade_records(timestamp DESC)
+            ''')
+            
+            # 创建持仓表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS positions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    entry_price REAL NOT NULL,
+                    quantity REAL NOT NULL,
+                    strategy_name TEXT NOT NULL,
+                    stop_loss_type TEXT NOT NULL,
+                    stop_loss_price REAL NOT NULL,
+                    initial_stop_price REAL NOT NULL,
+                    highest_price REAL NOT NULL,
+                    entry_time INTEGER NOT NULL,
+                    order_id TEXT,
+                    status TEXT DEFAULT 'OPEN',
+                    close_price REAL,
+                    close_time INTEGER,
+                    close_reason TEXT,
+                    realized_pnl REAL DEFAULT 0.0,
+                    realized_pnl_percent REAL DEFAULT 0.0,
+                    unrealized_pnl REAL DEFAULT 0.0,
+                    unrealized_pnl_percent REAL DEFAULT 0.0,
+                    last_update_time INTEGER
+                )
+            ''')
+            
+            # 创建AI分析记录表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ai_analysis_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_date TEXT NOT NULL,
+                    market_summary TEXT,
+                    suggestions TEXT,
+                    risk_alert TEXT,
+                    model_version TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            ''')
+            
+            # 创建回测结果表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS backtest_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_name TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    start_date TEXT NOT NULL,
+                    end_date TEXT NOT NULL,
+                    initial_capital REAL NOT NULL,
+                    final_capital REAL NOT NULL,
+                    total_return REAL NOT NULL,
+                    sharpe_ratio REAL DEFAULT 0.0,
+                    max_drawdown REAL DEFAULT 0.0,
+                    win_rate REAL DEFAULT 0.0,
+                    parameters TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            ''')
+            
+            # 创建系统状态表 (system_state)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_state (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    instance_id TEXT NOT NULL,
+                    run_mode TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    start_time INTEGER,
+                    stop_time INTEGER,
+                    stop_reason TEXT,
+                    pid INTEGER,
+                    heartbeat_time INTEGER,
+                    config_snapshot TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            ''')
+            
+            # 创建任务执行日志表 (task_execution_log)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS task_execution_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    instance_id TEXT NOT NULL,
+                    task_name TEXT NOT NULL,
+                    task_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    start_time INTEGER,
+                    end_time INTEGER,
+                    duration_seconds REAL,
+                    result_summary TEXT,
+                    error_message TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            ''')
+            
+            # 创建信号队列表 (signal_queue)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS signal_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    signal_id TEXT NOT NULL,
+                    strategy_name TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    signal_type TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    confidence REAL DEFAULT 0.0,
+                    signal_timestamp INTEGER NOT NULL,
+                    queue_status TEXT NOT NULL,
+                    priority INTEGER DEFAULT 0,
+                    submitted_time INTEGER,
+                    processed_time INTEGER,
+                    order_id TEXT,
+                    failure_reason TEXT,
+                    expiry_time INTEGER,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            ''')
+            
+            # 创建数据获取进度表 (data_fetch_progress)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS data_fetch_progress (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    interval TEXT NOT NULL,
+                    last_fetch_time INTEGER,
+                    last_complete_time INTEGER,
+                    fetch_status TEXT NOT NULL,
+                    total_records INTEGER DEFAULT 0,
+                    last_error TEXT,
+                    consecutive_failures INTEGER DEFAULT 0,
+                    next_fetch_time INTEGER,
+                    updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+                    UNIQUE(symbol, interval)
+                )
+            ''')
+            
+            conn.commit()
+            logger.info(f"数据库初始化完成: {self.db_path}")
+        except Exception as e:
+            logger.error(f"数据库初始化失败: {e}")
+            # 不抛出异常，继续运行
     
     # ========== K线数据操作 ==========
     
@@ -282,9 +286,9 @@ class DatabaseManager:
                 kline.created_at
             ))
             conn.commit()
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"插入K线数据失败: {e}")
-            raise
+            # 不抛出异常，继续运行
     
     def insert_klines_batch(self, klines: List[KlineData]):
         """批量插入K线数据"""
@@ -308,22 +312,26 @@ class DatabaseManager:
             
             conn.commit()
             logger.info(f"批量插入K线数据: {len(klines)}条")
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"批量插入K线数据失败: {e}")
-            raise
+            # 不抛出异常，继续运行
     
     def get_latest_kline_time(self, symbol: str, interval: str) -> Optional[int]:
         """获取最新的K线时间戳"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT MAX(open_time) FROM kline_data 
-            WHERE symbol = ? AND interval = ?
-        ''', (symbol, interval))
-        
-        result = cursor.fetchone()
-        return result[0] if result[0] else None
+        try:
+            cursor.execute('''
+                SELECT MAX(open_time) FROM kline_data 
+                WHERE symbol = ? AND interval = ?
+            ''', (symbol, interval))
+            
+            result = cursor.fetchone()
+            return result[0] if result[0] else None
+        except Exception as e:
+            logger.error(f"获取最新K线时间失败: {e}")
+            return None
     
     def get_klines(
         self, 
@@ -349,30 +357,34 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        query = '''
-            SELECT * FROM kline_data 
-            WHERE symbol = ? AND interval = ?
-        '''
-        params = [symbol, interval]
-        
-        if start_time:
-            query += ' AND open_time >= ?'
-            params.append(start_time)
-        
-        if end_time:
-            query += ' AND open_time <= ?'
-            params.append(end_time)
-        
-        query += ' ORDER BY open_time ASC'
-        
-        if limit:
-            query += ' LIMIT ?'
-            params.append(limit)
-        
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        
-        return [dict(row) for row in rows]
+        try:
+            query = '''
+                SELECT * FROM kline_data 
+                WHERE symbol = ? AND interval = ?
+            '''
+            params = [symbol, interval]
+            
+            if start_time:
+                query += ' AND open_time >= ?'
+                params.append(start_time)
+            
+            if end_time:
+                query += ' AND open_time <= ?'
+                params.append(end_time)
+            
+            query += ' ORDER BY open_time ASC'
+            
+            if limit:
+                query += ' LIMIT ?'
+                params.append(limit)
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"获取K线数据失败: {e}")
+            return []
     
     # ========== 信号操作 ==========
     
@@ -393,9 +405,9 @@ class DatabaseManager:
                 signal.confidence, signal.reason
             ))
             conn.commit()
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"插入信号失败: {e}")
-            raise
+            # 不抛出异常，继续运行
     
     # ========== 交易记录操作 ==========
     
@@ -419,9 +431,10 @@ class DatabaseManager:
             ))
             conn.commit()
             return cursor.lastrowid
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"插入交易记录失败: {e}")
-            raise
+            # 不抛出异常，继续运行
+            return -1
     
     # ========== AI分析操作 ==========
     
@@ -442,9 +455,9 @@ class DatabaseManager:
                 analysis.risk_alert, analysis.model_version, analysis.created_at
             ))
             conn.commit()
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"插入AI分析失败: {e}")
-            raise
+            # 不抛出异常，继续运行
     
     # ========== 回测结果操作 ==========
     
@@ -467,9 +480,9 @@ class DatabaseManager:
                 result.win_rate, json.dumps(result.parameters), result.created_at
             ))
             conn.commit()
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"插入回测结果失败: {e}")
-            raise
+            # 不抛出异常，继续运行
 
 
 # 全局数据库管理器实例

@@ -72,6 +72,17 @@ class BaseStrategy(ABC):
             return None
         
         try:
+            # 确保必要的列存在
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            if not all(col in df.columns for col in required_columns):
+                logger.warning(f"策略 {self.name} 数据缺少必要列")
+                return None
+            
+            # 确保数据不为空
+            if df.empty:
+                logger.warning(f"策略 {self.name} 数据为空")
+                return None
+            
             # 计算指标
             df_with_indicators = self.calculate_indicators(df.copy())
             

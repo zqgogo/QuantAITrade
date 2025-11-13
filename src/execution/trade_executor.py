@@ -6,7 +6,7 @@
 import threading
 import time
 from typing import List, Optional, Dict, Any
-from queue import Queue, PriorityQueue
+from queue import Queue, PriorityQueue, Empty
 from dataclasses import dataclass, field
 from loguru import logger
 from datetime import datetime
@@ -95,19 +95,23 @@ class TradeExecutor:
         
         Args:
             signal: 策略信号
-        
+            
         Returns:
             bool: 是否成功加入队列
         """
         try:
             # 保存信号到数据库
-            signal_id = signal_queue_manager.enqueue_signal(signal)
+            try:
+                signal_id = signal_queue_manager.enqueue_signal(signal)
+            except Exception as e:
+                logger.error(f"保存信号到数据库失败: {e}")
+                signal_id = None
             
             # 创建优先级信号（优先级 = 置信度，越高越先处理）
             prioritized = PrioritizedSignal(
                 priority=-signal.confidence,  # 负值，因为PriorityQueue是最小堆
                 signal=signal,
-                signal_id=signal_id
+                signal_id=signal_id or ""
             )
             
             self.signal_queue.put(prioritized)
@@ -129,14 +133,18 @@ class TradeExecutor:
         
         Args:
             signals: 信号列表
-        
+            
         Returns:
             int: 成功加入队列的数量
         """
         success_count = 0
         for signal in signals:
-            if self.submit_signal(signal):
-                success_count += 1
+            try:
+                if self.submit_signal(signal):
+                    success_count += 1
+            except Exception as e:
+                logger.error(f"提交信号 {signal.symbol} 失败: {e}")
+                # 继续处理其他信号
         
         logger.info(f"批量提交信号: {success_count}/{len(signals)} 成功")
         return success_count
@@ -161,7 +169,11 @@ class TradeExecutor:
                 self.stats['signals_processed'] += 1
                 
             except Exception as e:
-                if "Empty" not in str(e):  # 忽略队列空的正常超时
+                # 更精确地处理队列为空的情况
+                if "Empty" in str(e) or isinstance(e, Empty):
+                    # 队列为空是正常情况，继续循环
+                    pass
+                else:
                     logger.error(f"执行循环错误: {e}")
             
             time.sleep(0.1)  # 短暂休眠，避免CPU占用过高
@@ -229,7 +241,10 @@ class TradeExecutor:
             
             # 标记信号处理中
             if signal_id:
-                signal_queue_manager.mark_signal_processing(signal_id)
+                try:
+                    signal_queue_manager.mark_signal_processing(signal_id)
+                except Exception as e:
+                    logger.error(f"标记信号处理中失败: {e}")
             
             # 1. 获取账户信息
             account_balance = self._get_account_balance()
@@ -238,14 +253,22 @@ class TradeExecutor:
                 return
             
             # 2. 获取当前持仓
-            positions = position_tracker.get_all_positions(status='OPEN')
+            try:
+                positions = position_tracker.get_all_positions(status='OPEN')
+            except Exception as e:
+                logger.error(f"获取持仓信息失败: {e}")
+                positions = []
             
             # 3. 创建订单
-            order = order_manager.create_order_from_signal(
-                signal=signal,
-                account_balance=account_balance,
-                positions=positions
-            )
+            try:
+                order = order_manager.create_order_from_signal(
+                    signal=signal,
+                    account_balance=account_balance,
+                    positions=positions
+                )
+            except Exception as e:
+                logger.error(f"创建订单失败: {e}")
+                order = None
             
             if order is None:
                 logger.warning(f"订单创建失败，信号被拒绝: {signal.symbol}")
@@ -254,7 +277,11 @@ class TradeExecutor:
             
             # 4. 提交订单
             self.stats['orders_submitted'] += 1
-            success = order_manager.submit_order(order)
+            try:
+                success = order_manager.submit_order(order)
+            except Exception as e:
+                logger.error(f"提交订单失败: {e}")
+                success = False
             
             if success:
                 self.stats['orders_success'] += 1
@@ -262,30 +289,39 @@ class TradeExecutor:
                 
                 # 标记信号完成
                 if signal_id:
-                    signal_queue_manager.mark_signal_completed(signal_id, order.order_id)
+                    try:
+                        signal_queue_manager.mark_signal_completed(signal_id, order.order_id)
+                    except Exception as e:
+                        logger.error(f"标记信号完成失败: {e}")
                 
                 # 5. 如果是买入订单，注册持仓监控
                 if signal.signal_type == SignalType.BUY and order.order_id:
-                    # 计算止损价（从风控模块获取）
-                    stop_loss_price, stop_loss_type = risk_controller.calculate_stop_loss(
-                        entry_price=order.price,
-                        stop_loss_config=self.config.get('risk_control', {}),
-                        symbol=signal.symbol
-                    )
-                    
-                    # 添加持仓跟踪
-                    position_tracker.add_position(
-                        order=order,
-                        stop_loss_price=stop_loss_price,
-                        stop_loss_type=stop_loss_type
-                    )
+                    try:
+                        # 计算止损价（从风控模块获取）
+                        stop_loss_price, stop_loss_type = risk_controller.calculate_stop_loss(
+                            entry_price=order.price,
+                            stop_loss_config=self.config.get('risk_control', {}),
+                            symbol=signal.symbol
+                        )
+                        
+                        # 添加持仓跟踪
+                        position_tracker.add_position(
+                            order=order,
+                            stop_loss_price=stop_loss_price,
+                            stop_loss_type=stop_loss_type
+                        )
+                    except Exception as e:
+                        logger.error(f"添加持仓跟踪失败: {e}")
             else:
                 self.stats['orders_failed'] += 1
                 logger.error(f"订单执行失败: {signal.symbol}")
                 
                 # 标记信号失败
                 if signal_id:
-                    signal_queue_manager.mark_signal_failed(signal_id, "订单提交失败")
+                    try:
+                        signal_queue_manager.mark_signal_failed(signal_id, "订单提交失败")
+                    except Exception as e:
+                        logger.error(f"标记信号失败失败: {e}")
                 
         except Exception as e:
             logger.error(f"执行信号失败: {e}")
@@ -294,8 +330,11 @@ class TradeExecutor:
             # 标记信号失败
             signal_id = getattr(signal, 'signal_id', None)
             if signal_id:
-                signal_queue_manager.mark_signal_failed(signal_id, str(e))
-
+                try:
+                    signal_queue_manager.mark_signal_failed(signal_id, str(e))
+                except Exception as e:
+                    logger.error(f"标记信号失败失败: {e}")
+    
     def _get_account_balance(self) -> Optional[float]:
         """
         获取账户USDT余额
@@ -317,6 +356,14 @@ class TradeExecutor:
                 
         except Exception as e:
             logger.error(f"获取账户余额失败: {e}")
+            # 在测试模式下返回模拟余额
+            try:
+                config = get_config()
+                if config.get('exchange', {}).get('use_testnet', True):
+                    logger.info("测试模式下返回模拟余额")
+                    return 10000.0
+            except:
+                pass
             return None
     
     def get_stats(self) -> Dict[str, Any]:

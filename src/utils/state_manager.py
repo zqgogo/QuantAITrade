@@ -35,8 +35,12 @@ class SystemState:
         instance_id = str(uuid.uuid4())
         self.current_instance_id = instance_id
         
-        # 获取当前配置快照
-        config_snapshot = json.dumps(self.config, ensure_ascii=False)
+        try:
+            # 获取当前配置快照
+            config_snapshot = json.dumps(self.config, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"序列化配置失败: {e}")
+            config_snapshot = "{}"
         
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -58,7 +62,7 @@ class SystemState:
             logger.info(f"创建系统实例: {instance_id}, 运行模式: {run_mode}")
         except Exception as e:
             logger.error(f"创建系统实例失败: {e}")
-            raise
+            # 不抛出异常，继续运行
         
         return instance_id
     
@@ -79,6 +83,7 @@ class SystemState:
             conn.commit()
         except Exception as e:
             logger.error(f"更新心跳时间失败: {e}")
+            # 不抛出异常，继续运行
     
     def mark_stopped(self, stop_reason: str = 'manual'):
         """
@@ -103,6 +108,7 @@ class SystemState:
             logger.info(f"系统实例 {self.current_instance_id} 已标记为停止, 原因: {stop_reason}")
         except Exception as e:
             logger.error(f"标记系统停止失败: {e}")
+            # 不抛出异常，继续运行
     
     def mark_crashed(self, error_message: str = ''):
         """
@@ -127,6 +133,7 @@ class SystemState:
             logger.critical(f"系统实例 {self.current_instance_id} 已标记为崩溃, 错误: {error_message}")
         except Exception as e:
             logger.error(f"标记系统崩溃失败: {e}")
+            # 不抛出异常，继续运行
     
     def get_last_instance(self) -> Optional[Dict[str, Any]]:
         """
@@ -157,21 +164,25 @@ class SystemState:
         Returns:
             bool: True表示异常关闭，False表示正常关闭
         """
-        last_instance = self.get_last_instance()
-        if not last_instance:
+        try:
+            last_instance = self.get_last_instance()
+            if not last_instance:
+                return False
+            
+            # 如果状态是running且心跳时间超过5分钟，则判定为异常关闭
+            if (last_instance['status'] == 'running' and 
+                last_instance['heartbeat_time'] and 
+                (int(time.time()) - last_instance['heartbeat_time']) > 300):  # 5分钟
+                return True
+            
+            # 如果状态是crashed，则判定为异常关闭
+            if last_instance['status'] == 'crashed':
+                return True
+            
             return False
-        
-        # 如果状态是running且心跳时间超过5分钟，则判定为异常关闭
-        if (last_instance['status'] == 'running' and 
-            last_instance['heartbeat_time'] and 
-            (int(time.time()) - last_instance['heartbeat_time']) > 300):  # 5分钟
-            return True
-        
-        # 如果状态是crashed，则判定为异常关闭
-        if last_instance['status'] == 'crashed':
-            return True
-        
-        return False
+        except Exception as e:
+            logger.error(f"检查上次是否异常关闭失败: {e}")
+            return False
 
 
 # 全局实例

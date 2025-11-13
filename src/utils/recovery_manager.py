@@ -62,6 +62,7 @@ class RecoveryManager:
                     logger.info(f"恢复持仓监控: {position['symbol']}")
                 except Exception as e:
                     logger.error(f"恢复持仓 {row['symbol']} 失败: {e}")
+                    # 继续处理其他持仓
             
             logger.info(f"持仓监控恢复完成，共恢复 {recovered_count} 个持仓")
             return recovered_count
@@ -90,11 +91,12 @@ class RecoveryManager:
                 try:
                     # 同步订单状态
                     order = dict(row)
-                    self.order_manager.sync_order_status(order['order_id'])
+                    self.order_manager.sync_order_status(order['symbol'], order['order_id'])
                     recovered_count += 1
                     logger.info(f"同步订单状态: {order['order_id']}")
                 except Exception as e:
                     logger.error(f"同步订单 {row['order_id']} 失败: {e}")
+                    # 继续处理其他订单
             
             logger.info(f"订单状态同步完成，共处理 {recovered_count} 个订单")
             return recovered_count
@@ -142,6 +144,7 @@ class RecoveryManager:
                     logger.info(f"恢复数据获取进度: {progress['symbol']}")
                 except Exception as e:
                     logger.error(f"恢复数据获取进度 {row['symbol']} 失败: {e}")
+                    # 继续处理其他记录
             
             logger.info(f"数据获取进度恢复完成，共恢复 {recovered_count} 个记录")
             return recovered_count
@@ -157,12 +160,18 @@ class RecoveryManager:
         
         try:
             # 校验持仓数据一致性
-            position_inconsistencies = self._verify_position_consistency()
-            inconsistencies.extend(position_inconsistencies)
+            try:
+                position_inconsistencies = self._verify_position_consistency()
+                inconsistencies.extend(position_inconsistencies)
+            except Exception as e:
+                logger.error(f"持仓一致性校验异常: {e}")
             
             # 校验订单数据一致性
-            order_inconsistencies = self._verify_order_consistency()
-            inconsistencies.extend(order_inconsistencies)
+            try:
+                order_inconsistencies = self._verify_order_consistency()
+                inconsistencies.extend(order_inconsistencies)
+            except Exception as e:
+                logger.error(f"订单一致性校验异常: {e}")
             
             if inconsistencies:
                 logger.warning(f"发现 {len(inconsistencies)} 个数据不一致问题")
@@ -208,20 +217,35 @@ class RecoveryManager:
         
         try:
             # 按优先级执行恢复
-            # P0: 持仓恢复与止损监控
-            self.recover_positions()
+            try:
+                # P0: 持仓恢复与止损监控
+                self.recover_positions()
+            except Exception as e:
+                logger.error(f"持仓恢复失败: {e}")
             
-            # P1: 未完成订单状态同步
-            self.recover_orders()
+            try:
+                # P1: 未完成订单状态同步
+                self.recover_orders()
+            except Exception as e:
+                logger.error(f"订单恢复失败: {e}")
             
-            # P2: 未处理信号恢复
-            self.recover_signals()
+            try:
+                # P2: 未处理信号恢复
+                self.recover_signals()
+            except Exception as e:
+                logger.error(f"信号恢复失败: {e}")
             
-            # P3: 数据获取进度恢复
-            self.recover_data_progress()
+            try:
+                # P3: 数据获取进度恢复
+                self.recover_data_progress()
+            except Exception as e:
+                logger.error(f"数据进度恢复失败: {e}")
             
-            # 数据一致性校验
-            self.verify_data_consistency()
+            try:
+                # 数据一致性校验
+                self.verify_data_consistency()
+            except Exception as e:
+                logger.error(f"数据一致性校验失败: {e}")
             
             logger.info("系统恢复流程执行完成")
             return True

@@ -77,7 +77,7 @@ class ConfigLoader:
         
         # 使用配置文件中的路径
         main_config = self.get_main_config()
-        db_path = main_config.get('database', {}).get('path', 'runtime/data/kline.db')
+        db_path = main_config.get('database', {}).get('path', 'data/kline.db')
         return self.project_root / db_path
     
     def get_log_directory(self) -> Path:

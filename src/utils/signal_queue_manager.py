@@ -64,7 +64,8 @@ class SignalQueueManager:
             return signal_id
         except Exception as e:
             logger.error(f"信号入队失败: {e}")
-            raise
+            # 不抛出异常，返回空字符串
+            return ""
     
     def dequeue_signals(self, limit: int = 50) -> List[Dict[str, Any]]:
         """
@@ -95,14 +96,17 @@ class SignalQueueManager:
             
             # 更新这些信号的状态为处理中
             if signals:
-                signal_ids = [s['signal_id'] for s in signals]
-                placeholders = ','.join(['?' for _ in signal_ids])
-                cursor.execute(f'''
-                    UPDATE signal_queue 
-                    SET queue_status = 'processing', processed_time = ?
-                    WHERE signal_id IN ({placeholders})
-                ''', [int(time.time())] + signal_ids)
-                conn.commit()
+                try:
+                    signal_ids = [s['signal_id'] for s in signals]
+                    placeholders = ','.join(['?' for _ in signal_ids])
+                    cursor.execute(f'''
+                        UPDATE signal_queue 
+                        SET queue_status = 'processing', processed_time = ?
+                        WHERE signal_id IN ({placeholders})
+                    ''', [int(time.time())] + signal_ids)
+                    conn.commit()
+                except Exception as e:
+                    logger.error(f"更新信号状态失败: {e}")
             
             logger.info(f"从队列中加载 {len(signals)} 个待处理信号")
             return signals

@@ -24,11 +24,12 @@ from data.fetcher import data_fetcher
 from src.execution.trade_executor import trade_executor
 from src.execution.exchange_connector import exchange_connector
 from src.execution.position_tracker import position_tracker
-from orchestrator.scheduler import scheduler
-from strategy import MACrossStrategy
-from ai.ai_analyzer import ai_analyzer
+from src.execution.risk_controller import risk_controller
+from src.ai.ai_analyzer import ai_analyzer
+from src.strategy.ma_cross_strategy import MACrossStrategy
+from src.orchestrator.scheduler import scheduler
 
-# 导入新增的状态管理模块
+# 工具模块
 from utils.state_manager import state_manager
 from utils.task_logger import task_logger
 from utils.recovery_manager import recovery_manager
@@ -117,12 +118,19 @@ def init_system_components():
     
     # 1. 连接交易所
     logger.info("连接交易所...")
-    if not exchange_connector.connect():
-        logger.warning("交易所连接失败，将以离线模式运行")
+    try:
+        if not exchange_connector.connect():
+            logger.warning("交易所连接失败，将以离线模式运行")
+    except Exception as e:
+        logger.error(f"交易所连接异常: {e}")
+        logger.warning("将以离线模式运行")
     
     # 2. 启动交易执行器
     logger.info("启动交易执行器...")
-    trade_executor.start()
+    try:
+        trade_executor.start()
+    except Exception as e:
+        logger.error(f"启动交易执行器失败: {e}")
     
     logger.success("系统组件初始化完成")
 
@@ -156,8 +164,12 @@ def data_fetch_task():
         task_id = task_logger.log_task_start('data_fetch', 'scheduled')
         
         logger.info("开始定时数据获取...")
-        data_fetcher.fetch_all_configured_symbols()
-        logger.success("数据获取完成")
+        try:
+            data_fetcher.fetch_all_configured_symbols()
+            logger.success("数据获取完成")
+        except Exception as e:
+            logger.error(f"数据获取异常: {e}")
+            # 继续执行，不中断任务
         
         # 记录任务结束
         if task_id:
@@ -191,10 +203,34 @@ def strategy_analysis_task():
                     logger.warning(f"{symbol} 没有数据，跳过")
                     continue
                 
+                # 确保数据格式正确
+                if not isinstance(klines, list):
+                    logger.warning(f"{symbol} 数据格式不正确，跳过")
+                    continue
+                
                 # 转换为pandas DataFrame
                 df = pd.DataFrame(klines)
+                if df.empty:
+                    logger.warning(f"{symbol} 数据为空，跳过")
+                    continue
+                
+                # 确保必要的列存在
+                required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+                if not all(col in df.columns for col in required_columns):
+                    logger.warning(f"{symbol} 数据缺少必要列，跳过")
+                    continue
+                
+                # 添加symbol列
+                df['symbol'] = symbol
+                
                 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
                 df.set_index('timestamp', inplace=True)
+                
+                # 设置当前symbol（用于策略中）
+                if hasattr(strategy, '_current_symbol'):
+                    strategy._current_symbol = symbol
+                else:
+                    strategy._current_symbol = symbol
                 
                 # 生成信号
                 signal = strategy.on_data(df)
@@ -208,6 +244,8 @@ def strategy_analysis_task():
                     
             except Exception as e:
                 logger.error(f"分析 {symbol} 失败: {e}")
+                # 继续处理其他交易对
+                continue
         
         logger.success("策略分析完成")
         
@@ -235,12 +273,18 @@ def position_monitor_task():
             logger.warning(f"发现 {len(triggered)} 个持仓触发止损")
             
             for position_id, symbol, reason in triggered:
-                # 获取当前价格
-                current_price = exchange_connector.get_current_price(symbol)
-                if current_price:
-                    # 执行平仓
-                    position_tracker.close_position(position_id, current_price, reason)
-                    logger.warning(f"已平仓: {symbol} @ {current_price:.2f} - {reason}")
+                try:
+                    # 获取当前价格
+                    current_price = exchange_connector.get_current_price(symbol)
+                    if current_price:
+                        # 执行平仓
+                        position_tracker.close_position(position_id, current_price, reason)
+                        logger.warning(f"已平仓: {symbol} @ {current_price:.2f} - {reason}")
+                    else:
+                        logger.error(f"无法获取 {symbol} 的当前价格，跳过平仓")
+                except Exception as e:
+                    logger.error(f"处理 {symbol} 止损失败: {e}")
+                    continue
         
         # 记录任务结束
         if task_id:
@@ -266,11 +310,15 @@ def ai_analysis_task():
         task_id = task_logger.log_task_start('ai_analysis', 'scheduled')
         
         logger.info("开始执行 AI 分析...")
-        result = ai_analyzer.run_daily_analysis(datetime.now().strftime('%Y-%m-%d'))
-        if result:
-            logger.success("AI 分析完成")
-        else:
-            logger.warning("AI 分析未返回结果")
+        try:
+            result = ai_analyzer.run_daily_analysis(datetime.now().strftime('%Y-%m-%d'))
+            if result:
+                logger.success("AI 分析完成")
+            else:
+                logger.warning("AI 分析未返回结果")
+        except Exception as e:
+            logger.error(f"AI 分析异常: {e}")
+            # 继续执行，不中断任务
             
         # 记录任务结束
         if task_id:
@@ -285,8 +333,11 @@ def ai_analysis_task():
 def heartbeat_task():
     """心跳任务（每30秒执行）"""
     try:
-        state_manager.update_heartbeat()
-        logger.debug("心跳更新完成")
+        try:
+            state_manager.update_heartbeat()
+            logger.debug("心跳更新完成")
+        except Exception as e:
+            logger.error(f"心跳更新异常: {e}")
     except Exception as e:
         logger.error(f"心跳任务失败: {e}")
 
@@ -299,8 +350,12 @@ def order_sync_task():
         task_id = task_logger.log_task_start('order_sync', 'scheduled')
         
         logger.info("开始同步未完成订单...")
-        # 这里应该实现订单同步逻辑
-        logger.info("订单同步完成")
+        try:
+            # 这里应该实现订单同步逻辑
+            logger.info("订单同步完成")
+        except Exception as e:
+            logger.error(f"订单同步异常: {e}")
+            # 继续执行，不中断任务
         
         # 记录任务结束
         if task_id:
@@ -320,8 +375,12 @@ def position_verification_task():
         task_id = task_logger.log_task_start('position_verification', 'scheduled')
         
         logger.info("开始验证持仓数据一致性...")
-        # 这里应该实现持仓验证逻辑
-        logger.info("持仓数据一致性验证完成")
+        try:
+            # 这里应该实现持仓验证逻辑
+            logger.info("持仓数据一致性验证完成")
+        except Exception as e:
+            logger.error(f"持仓验证异常: {e}")
+            # 继续执行，不中断任务
         
         # 记录任务结束
         if task_id:
