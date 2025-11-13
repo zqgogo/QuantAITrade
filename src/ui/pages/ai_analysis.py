@@ -9,6 +9,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from loguru import logger
+import os
 
 from data.db_manager import db_manager
 from src.ai.ai_analyzer import ai_analyzer
@@ -34,6 +35,11 @@ class AIAnalysisPage:
         """
         st.title("🤖 AI 分析中心")
         
+        # 检查AI配置状态
+        if not self._check_ai_configuration():
+            self._render_ai_setup_guide()
+            return
+        
         # 创建标签页
         tab1, tab2, tab3, tab4 = st.tabs(["📊 最新分析", "📜 历史记录", "📈 效果追踪", "⚡ 手动分析"])
         
@@ -48,7 +54,140 @@ class AIAnalysisPage:
         
         with tab4:
             self._render_manual_analysis()
+    
+    def _check_ai_configuration(self) -> bool:
+        """
+        检查AI配置状态
+        
+        Returns:
+            bool: 是否已正确配置AI
+        """
+        # 检查OpenAI API密钥
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        return bool(api_key and ai_analyzer.client)
+    
+    def _render_ai_setup_guide(self):
+        """
+        渲染AI配置引导界面
+        """
+        st.info("💡 AI分析功能需要额外配置才能使用")
+        
+        st.markdown("### 🔧 配置步骤")
+        
+        st.markdown("1. **获取OpenAI API密钥**")
+        st.markdown("- 访问 [OpenAI官网](https://platform.openai.com/api-keys) 创建API密钥")
+        st.markdown("- 注意：使用API会产生费用，请根据需要充值")
+        
+        st.markdown("2. **配置环境变量**")
+        st.markdown("在项目根目录创建 `.env` 文件，添加以下内容：")
+        st.code("OPENAI_API_KEY=your_api_key_here", language="bash")
+        
+        st.markdown("3. **重启应用**")
+        st.markdown("配置完成后，重启Streamlit应用以使配置生效")
+        
+        st.markdown("### 📝 注意事项")
+        st.markdown("- 未配置API密钥时，AI分析功能将不可用")
+        st.markdown("- 系统其他功能（数据获取、策略信号等）仍可正常使用")
+        st.markdown("- 可以先使用模拟数据查看界面效果")
+        
+        # 提供模拟数据查看选项
+        if st.checkbox("🧪 查看模拟数据示例"):
+            self._render_demo_data()
+    
+    def _render_demo_data(self):
+        """
+        渲染演示数据
+        """
+        st.markdown("### 📊 演示数据")
+        
+        # 模拟最新分析
+        st.markdown("#### 最新AI分析示例")
+        demo_analysis = {
+            'analysis_date': '2025-11-13',
+            'model_version': 'gpt-4',
+            'confidence_level': 'high',
+            'market_summary': '市场整体呈现震荡走势，BTCUSDT在60000-70000区间内波动。建议关注关键支撑位和阻力位的突破情况。',
+            'risk_alerts': [
+                {
+                    'severity': 'medium',
+                    'risk_type': '波动性风险',
+                    'description': '近期市场波动性增加，建议适当降低仓位'
+                }
+            ],
+            'strategy_suggestions': [
+                {
+                    'suggestion_type': 'parameter_adjust',
+                    'target': 'MA交叉策略',
+                    'reason': '市场波动性增加，建议调整均线周期以适应当前市场',
+                    'current_value': '短周期:5, 长周期:20',
+                    'suggested_value': '短周期:7, 长周期:25',
+                    'expected_effect': '提高策略稳定性2-3%'
+                }
+            ]
+        }
+        
+        col_info1, col_info2 = st.columns([3, 1])
+        
+        with col_info1:
+            st.markdown(f"**分析日期**: {demo_analysis['analysis_date']}")
+            st.markdown(f"**AI模型**: {demo_analysis['model_version']}")
+        
+        with col_info2:
+            confidence = demo_analysis.get('confidence_level', 'unknown')
+            confidence_color = {
+                'high': '🟢',
+                'medium': '🟡',
+                'low': '🔴'
+            }.get(confidence, '⚪')
+            st.markdown(f"**置信度**: {confidence_color} {confidence.upper()}")
+        
+        st.divider()
+        
+        # 1. 市场总结
+        st.markdown("### 📈 市场总结")
+        st.info(demo_analysis['market_summary'])
+        
+        st.divider()
+        
+        # 2. 风险告警
+        risk_alerts = demo_analysis.get('risk_alerts', [])
+        if risk_alerts:
+            st.markdown("### ⚠️ 风险告警")
             
+            for alert in risk_alerts:
+                severity = alert.get('severity', 'unknown')
+                risk_type = alert.get('risk_type', '未知风险')
+                description = alert.get('description', '')
+                
+                # 根据严重程度选择样式
+                if severity == 'high':
+                    st.error(f"🔴 **高风险** - {risk_type}: {description}")
+                elif severity == 'medium':
+                    st.warning(f"🟡 **中风险** - {risk_type}: {description}")
+                else:
+                    st.info(f"🟢 **低风险** - {risk_type}: {description}")
+        else:
+            st.success("✅ 当前无重大风险告警")
+        
+        st.divider()
+        
+        # 3. 策略建议
+        suggestions = demo_analysis.get('strategy_suggestions', [])
+        if suggestions:
+            st.markdown("### 💡 策略建议")
+            st.markdown(f"共 **{len(suggestions)}** 条建议待审核")
+            
+            for i, suggestion in enumerate(suggestions, 1):
+                self._render_suggestion_card(i, suggestion)
+        else:
+            st.info("💡 暂无策略调整建议")
+        
+        # 4. 附加说明
+        additional_notes = demo_analysis.get('additional_notes', '')
+        if additional_notes:
+            with st.expander("📝 附加说明", expanded=False):
+                st.markdown(additional_notes)
+    
     def _render_suggestion_effect_tracking(self):
         """
         渲染建议效果追踪标签
@@ -167,14 +306,32 @@ class AIAnalysisPage:
         if not latest_analysis:
             st.info("💡 暂无AI分析记录，请先执行分析")
             
+            st.markdown("#### 🔍 为什么没有分析记录？")
+            st.markdown("- 系统刚初始化，尚未执行过AI分析")
+            st.markdown("- AI分析通常在预定时间自动执行")
+            st.markdown("- 您也可以手动触发分析")
+            
+            st.markdown("#### ▶️ 如何执行AI分析？")
+            st.markdown("1. 确保已正确配置OpenAI API密钥")
+            st.markdown("2. 点击下方按钮立即执行分析")
+            st.markdown("3. 等待分析完成（可能需要几秒钟到几分钟）")
+            
             if st.button("🚀 立即执行AI分析", type="primary"):
-                with st.spinner("AI分析中，请稍候..."):
-                    result = ai_analyzer.run_daily_analysis()
-                    if result:
-                        st.success("✅ AI分析完成")
-                        st.rerun()
-                    else:
-                        st.error("❌ AI分析失败")
+                with st.spinner("🤖 AI正在分析市场数据，请稍候..."):
+                    try:
+                        result = ai_analyzer.run_daily_analysis()
+                        if result:
+                            st.success("✅ AI分析完成！")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ AI分析失败，请检查日志")
+                            st.markdown("常见问题：")
+                            st.markdown("- OpenAI API密钥无效或余额不足")
+                            st.markdown("- 网络连接问题")
+                            st.markdown("- 数据库连接异常")
+                    except Exception as e:
+                        st.error(f"❌ AI分析过程中发生错误: {str(e)}")
             return
         
         # 显示分析信息
