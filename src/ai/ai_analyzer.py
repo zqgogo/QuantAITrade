@@ -10,9 +10,9 @@ from openai import OpenAI
 
 from data.db_manager import db_manager
 from config import get_config
-from ai.ai_data_preparer import ai_data_preparer
-from ai.ai_prompt_builder import ai_prompt_builder
-from ai.ai_suggestion_parser import ai_suggestion_parser
+from src.ai.ai_data_preparer import ai_data_preparer
+from src.ai.ai_prompt_builder import ai_prompt_builder
+from src.ai.ai_suggestion_parser import ai_suggestion_parser
 
 
 class AIAnalyzer:

@@ -537,7 +537,8 @@ class DashboardPage:
         - 夏普比率
         """
         # TODO: 实现策略绩效统计
-        pass
+        # 返回空的DataFrame而不是None
+        return pd.DataFrame()
     
     def _calculate_equity_curve(self) -> pd.DataFrame:
         """
@@ -549,7 +550,8 @@ class DashboardPage:
         - 回撤值
         """
         # TODO: 实现权益曲线计算
-        pass
+        # 返回空的DataFrame而不是None
+        return pd.DataFrame()
     
     def _export_positions_to_csv(self) -> str:
         """

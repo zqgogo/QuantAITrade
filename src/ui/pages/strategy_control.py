@@ -1,19 +1,18 @@
 """
 策略控制页面
-管理策略的启停、参数调整和信号查看
+管理策略配置、信号查看和手动操作
 """
 
 import streamlit as st
 import pandas as pd
-import yaml
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from loguru import logger
-from pathlib import Path
 
-from config import get_config, get_strategy_config
 from data.db_manager import db_manager
-from strategy import MACrossStrategy
+# from src.strategy.base_strategy import StrategyRegistry  # StrategyRegistry未定义
+from src.execution.trade_executor import trade_executor
 
 
 class StrategyControlPage:
@@ -21,9 +20,7 @@ class StrategyControlPage:
     
     def __init__(self):
         """初始化策略控制页面"""
-        self.config = get_config()
-        self.strategy_config = get_strategy_config()
-        self.config_path = Path("config/strategy_params.yaml")
+        pass
     
     def render(self):
         """
@@ -380,7 +377,7 @@ class StrategyControlPage:
                             st.text("无")
                     
                     with col2:
-                        st.markdown("**新参数**:"): 
+                        st.markdown("**新参数**:") 
                         for key, value in record['new_params'].items():
                             st.text(f"{key}: {value}")
                     

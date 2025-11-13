@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from data.db_manager import db_manager
-from ai.ai_analyzer import ai_analyzer
+from src.ai.ai_analyzer import ai_analyzer
 
 
 class AIAnalysisPage:

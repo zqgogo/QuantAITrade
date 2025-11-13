@@ -8,14 +8,14 @@ import sys
 from pathlib import Path
 
 # 添加项目根目录到路径
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # 导入页面模块
-from ui.pages import dashboard, strategy_control, ai_analysis
+from src.ui.pages import dashboard, strategy_control, ai_analysis
 
 # 导入系统状态检测器
-from utils.system_status_checker import system_status_checker
+from src.utils.system_status_checker import system_status_checker
 
 # ==================== 页面配置 ====================
 

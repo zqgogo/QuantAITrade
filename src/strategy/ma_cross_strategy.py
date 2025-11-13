@@ -1,22 +1,25 @@
 """
-均线交叉策略
-短期均线上穿长期均线时买入，下穿时卖出
+MA交叉策略
+基于短期和长期移动平均线交叉的交易策略
 """
 
 import pandas as pd
-from typing import Optional
+import numpy as np
+from typing import List, Dict, Any, Optional
 from loguru import logger
 
-from strategy.base_strategy import BaseStrategy
+from src.strategy.base_strategy import BaseStrategy
 from data.models import Signal, SignalType
 
 
 class MACrossStrategy(BaseStrategy):
-    """均线交叉策略"""
+    """
+    MA交叉策略实现
+    """
     
     def __init__(self, params: dict = None):
         """
-        初始化均线交叉策略
+        初始化MA交叉策略
         
         Args:
             params: 策略参数
