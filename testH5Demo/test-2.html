@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>GoJS 平行线 + 梯子线（固定贴边版）</title>
+  <script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
+  <style>
+    html, body, #diagramDiv {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="diagramDiv"></div>
+
+<script>
+const $ = go.GraphObject.make;
+
+/* ================= 配置 ================= */
+const CONFIG = {
+  ladderMode: "fixed", // fixed | ratio
+
+  parallelGap: 18,
+  ladderHalfLength: 14,
+
+  ladderCountPerSide: 3,
+
+  ladderFixed: {
+    offsetFromNode: 36, // 梯子线距节点的固定距离
+    spacing: 18         // 梯子线之间的固定间距
+  }
+};
+
+/* ================= Diagram ================= */
+const diagram = $(go.Diagram, "diagramDiv", {
+  "undoManager.isEnabled": true
+});
+
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    { locationSpot: go.Spot.Center },
+    new go.Binding("location", "loc", go.Point.parse)
+      .makeTwoWay(go.Point.stringify),
+    $(go.Shape, "RoundedRectangle", {
+      fill: "#fff",
+      stroke: "#333",
+      strokeWidth: 2
+    }),
+    $(go.TextBlock, { margin: 10 },
+      new go.Binding("text"))
+  );
+
+/* ================= Link ================= */
+class ParallelLadderLink extends go.Link {
+  computePoints() {
+    const A = this.fromNode;
+    const B = this.toNode;
+    if (!A || !B) return false;
+
+    const a = A.actualBounds;
+    const b = B.actualBounds;
+
+    const pA = new go.Point(a.right, a.centerY);
+    const pB = new go.Point(b.left,  b.centerY);
+
+    const dx = pB.x - pA.x;
+    const dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return false;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny =  ux;
+
+    this.clearPoints();
+
+    // ===== 平行线 =====
+    if (this.data.kind === "parallel") {
+      const offset = this.data.index === 0
+        ? -CONFIG.parallelGap
+        :  CONFIG.parallelGap;
+
+      this.addPoint(new go.Point(
+        pA.x + nx * offset,
+        pA.y + ny * offset
+      ));
+      this.addPoint(new go.Point(
+        pB.x + nx * offset,
+        pB.y + ny * offset
+      ));
+    }
+
+    // ===== 梯子线 =====
+    if (this.data.kind === "ladder") {
+      const d = this.data.d;
+      let cx, cy;
+
+      if (this.data.side === "A") {
+        cx = pA.x + ux * d;
+        cy = pA.y + uy * d;
+      } else {
+        cx = pB.x - ux * d;
+        cy = pB.y - uy * d;
+      }
+
+      const L = CONFIG.ladderHalfLength;
+
+      this.addPoint(new go.Point(
+        cx - nx * L,
+        cy - ny * L
+      ));
+      this.addPoint(new go.Point(
+        cx + nx * L,
+        cy + ny * L
+      ));
+    }
+
+    return true;
+  }
+}
+
+diagram.linkTemplate =
+  $(ParallelLadderLink,
+    { selectable: false },
+    $(go.Shape, { stroke: "#333", strokeWidth: 2 })
+  );
+
+/* ================= Model ================= */
+diagram.model = new go.GraphLinksModel(
+  [
+    { key: "A", text: "节点 A", loc: "120 180" },
+    { key: "B", text: "节点 B", loc: "520 260" }
+  ],
+  [
+    { key: "p1", from: "A", to: "B", kind: "parallel", index: 0 },
+    { key: "p2", from: "A", to: "B", kind: "parallel", index: 1 }
+  ]
+);
+
+/* ================= 梯子线生成 ================= */
+function buildLadders() {
+  const { offsetFromNode, spacing } = CONFIG.ladderFixed;
+  const m = diagram.model;
+
+  for (let i = 0; i < CONFIG.ladderCountPerSide; i++) {
+    const d = offsetFromNode + i * spacing;
+
+    m.addLinkData({
+      key: "LA_" + i,
+      from: "A",
+      to: "B",
+      kind: "ladder",
+      side: "A",
+      d
+    });
+
+    m.addLinkData({
+      key: "LB_" + i,
+      from: "A",
+      to: "B",
+      kind: "ladder",
+      side: "B",
+      d
+    });
+  }
+}
+
+diagram.addDiagramListener("InitialLayoutCompleted", buildLadders);
+diagram.addDiagramListener("SelectionMoved", () => {
+  diagram.links.each(l => l.invalidateRoute());
+});
+</script>
+</body>
+</html>
