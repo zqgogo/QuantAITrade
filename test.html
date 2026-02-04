@@ -2,9 +2,8 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>三节点供电 + 横向梯子线（最终稳定版）</title>
+  <title>三节点供电 + 三条横向梯子线（贴边优化版）</title>
 
-  <!-- 按你的要求，不改 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/gojs@3.0.24/release/go.js"></script>
 
   <style>
@@ -26,7 +25,7 @@ const diagram = $(go.Diagram, "diagramDiv", {
   "undoManager.isEnabled": true
 });
 
-/* ================= Node（改回普通样式） ================= */
+/* ================= Node ================= */
 diagram.nodeTemplate =
   $(go.Node, "Auto",
     { locationSpot: go.Spot.Center },
@@ -34,28 +33,22 @@ diagram.nodeTemplate =
       .makeTwoWay(go.Point.stringify),
 
     $(go.Shape, "RoundedRectangle", {
-      fill: "#ffffff",
+      fill: "#fff",
       stroke: "#333",
       strokeWidth: 2
     }),
 
-    $(go.TextBlock, {
-      margin: 10,
-      font: "14px sans-serif"
-    }, new go.Binding("text", "key"))
+    $(go.TextBlock, { margin: 10 }, new go.Binding("text", "key"))
   );
 
 /* ================= 单线 Link ================= */
 diagram.linkTemplate =
   $(go.Link,
     { selectable: false },
-    $(go.Shape, {
-      stroke: "#333",
-      strokeWidth: 2
-    })
+    $(go.Shape, { stroke: "#333", strokeWidth: 2 })
   );
 
-/* ================= Model（A 在上） ================= */
+/* ================= Model ================= */
 diagram.model = new go.GraphLinksModel(
   [
     { key: "A", loc: "300 80"  },
@@ -68,23 +61,23 @@ diagram.model = new go.GraphLinksModel(
   ]
 );
 
-/* ================= 梯子横线 Part ================= */
+/* ================= 梯子线 Part ================= */
 const ladderPart =
   $(go.Part,
-    {
-      selectable: false,
-      layerName: "Foreground"
-    },
+    { selectable: false, layerName: "Foreground" },
     $(go.Shape, {
       name: "LADDER",
       stroke: "red",
       strokeWidth: 3
     })
   );
-
 diagram.add(ladderPart);
 
-/* ================= 工具：线性插值 ================= */
+/* ================= 参数 ================= */
+const LADDER_T_VALUES = [0.22, 0.27, 0.32];
+const TOUCH_OFFSET = 3; // 梯子端点“贴边”微调距离（像素）
+
+/* ================= 工具 ================= */
 function lerp(p1, p2, t) {
   return new go.Point(
     p1.x + (p2.x - p1.x) * t,
@@ -92,42 +85,52 @@ function lerp(p1, p2, t) {
   );
 }
 
-/* ================= 重绘梯子线 ================= */
+function pushAlong(from, to, point, distance) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return new go.Point(
+    point.x + (dx / len) * distance,
+    point.y + (dy / len) * distance
+  );
+}
+
+/* ================= 重绘梯子 ================= */
 function redrawLadder() {
   const A = diagram.findNodeForKey("A");
   const B = diagram.findNodeForKey("B");
   const C = diagram.findNodeForKey("C");
   if (!A || !B || !C) return;
 
-  // A -> B 单线端点
   const AB_from = A.getDocumentPoint(go.Spot.Bottom);
   const AB_to   = B.getDocumentPoint(go.Spot.Top);
 
-  // A -> C 单线端点
   const AC_from = A.getDocumentPoint(go.Spot.Bottom);
   const AC_to   = C.getDocumentPoint(go.Spot.Top);
 
-  // 在两条单线的同一比例位置取点
-  // 这个比例决定梯子“离 A 多近”
-  const t = 0.45;
-
-  const pLeft  = lerp(AB_from, AB_to, t);
-  const pRight = lerp(AC_from, AC_to, t);
-
-  const shape = ladderPart.findObject("LADDER");
-
   const geo = new go.Geometry();
-  const fig = new go.PathFigure(pLeft.x, pLeft.y, false);
-  fig.add(new go.PathSegment(go.PathSegment.Line, pRight.x, pRight.y));
-  geo.add(fig);
 
-  shape.geometry = geo;
+  LADDER_T_VALUES.forEach(t => {
+    let left  = lerp(AB_from, AB_to, t);
+    let right = lerp(AC_from, AC_to, t);
+
+    // ⭐ 关键优化：端点贴边
+    left  = pushAlong(AB_from, AB_to, left,  TOUCH_OFFSET);
+    right = pushAlong(AC_from, AC_to, right, -TOUCH_OFFSET);
+
+    const fig = new go.PathFigure(left.x, left.y, false);
+    fig.add(new go.PathSegment(go.PathSegment.Line, right.x, right.y));
+    geo.add(fig);
+  });
+
+  ladderPart.findObject("LADDER").geometry = geo;
 }
 
-/* ================= 监听 ================= */
+/* ================= 实时监听 ================= */
+diagram.addModelChangedListener(e => {
+  if (e.propertyName === "loc") redrawLadder();
+});
 diagram.addDiagramListener("InitialLayoutCompleted", redrawLadder);
-diagram.addDiagramListener("SelectionMoved", redrawLadder);
-diagram.addDiagramListener("ViewportBoundsChanged", redrawLadder);
 
 </script>
 </body>
