@@ -42,27 +42,38 @@ class DashboardPage:
             if st.button("🔄 刷新", use_container_width=True):
                 st.rerun()
         
+        # 添加间距
+        st.markdown("<br>", unsafe_allow_html=True)
+        
         # 1. 账户总览
         self._render_account_overview()
         
+        st.markdown("<br>", unsafe_allow_html=True)
         st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 2. 持仓列表
         self._render_positions_list()
         
+        st.markdown("<br>", unsafe_allow_html=True)
         st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 3. 最近交易
         self._render_recent_trades()
         
+        st.markdown("<br>", unsafe_allow_html=True)
         st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 4. 策略绩效（预留）
         with st.expander("📈 策略绩效分析", expanded=False):
+            st.markdown("<br>", unsafe_allow_html=True)
             self._render_strategy_performance()
         
         # 5. 资产曲线（预留）
         with st.expander("💰 资产曲线", expanded=False):
+            st.markdown("<br>", unsafe_allow_html=True)
             self._render_equity_curve()
     
     def _render_account_overview(self):
@@ -77,6 +88,7 @@ class DashboardPage:
         - 总收益率
         """
         st.subheader("💰 账户总览")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 获取账户数据
         account_data = self._get_account_data()
@@ -118,7 +130,9 @@ class DashboardPage:
             )
         
         # 风险指标（第二行）
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 风险指标")
+        st.markdown("<br>", unsafe_allow_html=True)
         col5, col6, col7, col8 = st.columns(4)
         
         with col5:
@@ -152,6 +166,7 @@ class DashboardPage:
         - 提供快速平仓按钮（预留）
         """
         st.subheader("📈 当前持仓")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 获取持仓数据
         positions = self._get_positions_data()
@@ -200,6 +215,7 @@ class DashboardPage:
         - 计算盈亏统计
         """
         st.subheader("💼 最近交易")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 时间范围选择
         col_time1, col_time2, col_time3 = st.columns([2, 2, 2])

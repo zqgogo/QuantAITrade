@@ -34,6 +34,7 @@ class StrategyControlPage:
         5. 快速回测功能
         """
         st.title("⚙️ 策略控制中心")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 创建标签页
         tab1, tab2, tab3 = st.tabs(["📋 策略管理", "🎯 策略信号", "🔧 参数调整"])
@@ -57,6 +58,7 @@ class StrategyControlPage:
         - 策略绩效概览
         """
         st.subheader("📋 策略列表")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 获取策略列表
         strategies = self._get_strategy_list()
@@ -126,6 +128,7 @@ class StrategyControlPage:
         - 信号执行状态追踪
         """
         st.subheader("🎯 策略信号")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 筛选条件
         col_filter1, col_filter2, col_filter3 = st.columns(3)
@@ -206,6 +209,7 @@ class StrategyControlPage:
         - 一键回测功能
         """
         st.subheader("🔧 策略参数调整")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 选择要调整的策略
         strategies = self._get_strategy_list()

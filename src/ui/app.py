@@ -6,6 +6,7 @@ QuantAITrade Web界面主程序
 import streamlit as st
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent.parent
@@ -29,23 +30,210 @@ st.set_page_config(
     }
 )
 
-# 自定义CSS样式
+# 自定义CSS样式 - 专业量化交易系统设计
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #1f77b4;
+    /* ==================== 全局样式 ==================== */
+    .main {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    
+    /* 标题样式 */
+    h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 1.5rem;
+        letter-spacing: -0.02em;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-top: 2rem;
         margin-bottom: 1rem;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
+    
+    h3 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #34495e;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
     }
+    
+    h4 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #34495e;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* 段落和文本间距 */
+    p {
+        margin-bottom: 0.75rem;
+        line-height: 1.6;
+    }
+    
+    /* ==================== 侧边栏样式 ==================== */
+    .css-1d391kg {
+        padding-top: 1.5rem;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+        border-right: 1px solid #e9ecef;
+    }
+    
+    [data-testid="stSidebar"] .css-1d391kg {
+        padding: 1.5rem 1rem;
+    }
+    
+    /* ==================== 指标卡片样式 ==================== */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+    
+    [data-testid="stMetricDelta"] {
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+    
+    /* ==================== 按钮样式 ==================== */
     .stButton>button {
-        border-radius: 0.5rem;
+        border-radius: 8px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* 主要按钮 */
+    .stButton>button[kind="primary"] {
+        background-color: #2563eb;
+        color: white;
+    }
+    
+    .stButton>button[kind="primary"]:hover {
+        background-color: #1d4ed8;
+    }
+    
+    /* ==================== 输入框样式 ==================== */
+    .stTextInput>div>div>input,
+    .stNumberInput>div>div>input,
+    .stSelectbox>div>div>select {
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.95rem;
+    }
+    
+    .stTextInput>div>div>input:focus,
+    .stNumberInput>div>div>input:focus,
+    .stSelectbox>div>div>select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    /* ==================== 标签页样式 ==================== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    /* ==================== 数据框样式 ==================== */
+    .dataframe {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* ==================== 分隔线样式 ==================== */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    /* ==================== 容器间距 ==================== */
+    .element-container {
+        margin-bottom: 1.5rem;
+    }
+    
+    /* ==================== 卡片样式 ==================== */
+    [data-testid="stExpander"] {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    /* ==================== 信息框样式 ==================== */
+    .stAlert {
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* ==================== 表格样式 ==================== */
+    table {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* ==================== 滚动条样式 ==================== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    
+    /* ==================== 响应式间距 ==================== */
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 2rem;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -140,21 +328,21 @@ elif page == "⚙️ 系统设置":
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["基本设置", "风控配置", "AI配置", "告警设置", "配置管理"])
     
     with tab1:
-        self._render_basic_settings()
+        _render_basic_settings()
     
     with tab2:
-        self._render_risk_settings()
+        _render_risk_settings()
     
     with tab3:
-        self._render_ai_settings()
+        _render_ai_settings()
     
     with tab4:
-        self._render_alert_settings()
+        _render_alert_settings()
     
     with tab5:
-        self._render_config_management()
-        
-def _render_basic_settings(self):
+        _render_config_management()
+
+def _render_basic_settings():
     """
     渲染基本设置标签
     """
@@ -208,7 +396,7 @@ def _render_basic_settings(self):
     if st.button("💾 保存基本设置", type="primary"):
         st.success("✅ 基本设置已保存")
         
-def _render_risk_settings(self):
+def _render_risk_settings():
     """
     渲染风控配置标签
     """
@@ -273,7 +461,7 @@ def _render_risk_settings(self):
     if st.button("💾 保存风控配置", type="primary"):
         st.success("✅ 风控配置已保存")
         
-def _render_ai_settings(self):
+def _render_ai_settings():
     """
     渲染AI配置标签
     """
@@ -329,7 +517,7 @@ def _render_ai_settings(self):
     if st.button("💾 保存AI配置", type="primary"):
         st.success("✅ AI配置已保存")
         
-def _render_alert_settings(self):
+def _render_alert_settings():
     """
     渲染告警设置标签
     """
@@ -394,7 +582,7 @@ def _render_alert_settings(self):
     if st.button("💾 保存告警设置", type="primary"):
         st.success("✅ 告警设置已保存")
         
-def _render_config_management(self):
+def _render_config_management():
     """
     渲染配置管理标签
     """

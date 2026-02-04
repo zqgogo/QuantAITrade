@@ -34,6 +34,7 @@ class AIAnalysisPage:
         5. 手动触发AI分析
         """
         st.title("🤖 AI 分析中心")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 检查AI配置状态
         if not self._check_ai_configuration():
@@ -193,6 +194,7 @@ class AIAnalysisPage:
         渲染建议效果追踪标签
         """
         st.subheader("📈 建议效果追踪")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 说明文字
         st.markdown("""
@@ -299,6 +301,7 @@ class AIAnalysisPage:
         - 列出策略建议（可操作）
         """
         st.subheader("📊 最新AI分析")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 获取最新分析
         latest_analysis = self._get_latest_analysis()
@@ -476,6 +479,7 @@ class AIAnalysisPage:
         - 建议采纳统计
         """
         st.subheader("📜 AI分析历史")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 时间范围选择
         col1, col2 = st.columns([2, 3])
@@ -545,6 +549,7 @@ class AIAnalysisPage:
         - 显示分析进度
         """
         st.subheader("⚡ 手动触发AI分析")
+        st.markdown("<br>", unsafe_allow_html=True)
         
         st.markdown("""
         手动分析功能允许您在任何时候触发AI分析，而不必等待定时任务。
