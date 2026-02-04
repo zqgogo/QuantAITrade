@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>GoJS 严格平行直线（可扩展版）</title>
+  <script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
+  <style>
+    html, body, #diagramDiv {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="diagramDiv"></div>
+
+<script>
+const $ = go.GraphObject.make;
+
+/* ========= 自定义：严格平行直线 Link ========= */
+class ParallelStraightLink extends go.Link {
+  computePoints() {
+    const fromNode = this.fromNode;
+    const toNode = this.toNode;
+    if (!fromNode || !toNode) return false;
+
+    const fromPt = fromNode.getDocumentPoint(go.Spot.Right);
+    const toPt   = toNode.getDocumentPoint(go.Spot.Left);
+
+    const dx = toPt.x - fromPt.x;
+    const dy = toPt.y - fromPt.y;
+    const len = Math.hypot(dx, dy) || 1;
+
+    // 法线向量
+    const nx = -dy / len;
+    const ny =  dx / len;
+
+    const offset = this.data.offset || 0;
+
+    const p1 = new go.Point(
+      fromPt.x + nx * offset,
+      fromPt.y + ny * offset
+    );
+    const p2 = new go.Point(
+      toPt.x + nx * offset,
+      toPt.y + ny * offset
+    );
+
+    this.clearPoints();
+    this.addPoint(p1);
+    this.addPoint(p2);
+    return true;
+  }
+}
+
+/* ========= Diagram ========= */
+const diagram = $(go.Diagram, "diagramDiv", {
+  "undoManager.isEnabled": true
+});
+
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    $(go.Shape, "RoundedRectangle", {
+      fill: "#fff",
+      stroke: "#333"
+    }),
+    $(go.TextBlock, {
+      margin: 10
+    }, new go.Binding("text", "text"))
+  );
+
+// 使用自定义 Link（无箭头）
+diagram.linkTemplate =
+  $(ParallelStraightLink,
+    $(go.Shape, {
+      strokeWidth: 2,
+      stroke: "#333"
+    })
+  );
+
+/* ========= 工具函数：生成平行线 ========= */
+function buildParallelLinks(from, to, count = 2, spacing = 30) {
+  const links = [];
+  const start = -((count - 1) * spacing) / 2;
+
+  for (let i = 0; i < count; i++) {
+    links.push({
+      key: `${from}-${to}-${i}`,
+      from,
+      to,
+      offset: start + i * spacing
+    });
+  }
+  return links;
+}
+
+/* ========= Model ========= */
+const model = new go.GraphLinksModel();
+model.linkKeyProperty = "key";
+
+model.nodeDataArray = [
+  { key: "A", text: "节点 A", loc: "0 0" },
+  { key: "B", text: "节点 B", loc: "220 0" } // 横向距离也稍微拉大
+];
+
+// 👇 这里控制“几条线 + 间距”
+model.linkDataArray = buildParallelLinks("A", "B", 2, 30);
+// 例如：
+// buildParallelLinks("A", "B", 3, 30)
+// buildParallelLinks("A", "B", 4, 40)
+
+diagram.model = model;
+diagram.nodeTemplate.bind("location", "loc", go.Point.parse);
+</script>
+</body>
+</html>
