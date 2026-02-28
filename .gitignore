@@ -53,3 +53,10 @@ Thumbs.db
 config/local_*.yaml
 backups/
 temp/
+runtime/
+
+# IDE / Tool
+.qoder/
+
+# Node (e.g. testH5Demo if ever has deps)
+node_modules/
