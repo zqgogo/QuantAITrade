@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>LadderLink 最终修复版</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/gojs@3.0.24/release/go.js"></script>
+
+  <style>
+    html, body, #diagramDiv {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+<div id="diagramDiv"></div>
+
+<script>
+const $ = go.GraphObject.make;
+
+/* ================= 自定义 LadderLink ================= */
+class LadderLink extends go.Link {
+  constructor() {
+    super();
+    this.layerName = "Foreground";
+    this.selectable = false;
+    this._tValues = [0.2, 0.3, 0.4];
+  }
+
+  lerp(p1, p2, t) {
+    return new go.Point(
+      p1.x + (p2.x - p1.x) * t,
+      p1.y + (p2.y - p1.y) * t
+    );
+  }
+
+  makeGeometry() {
+    const geo = new go.Geometry();
+
+    const B = this.fromNode;
+    const C = this.toNode;
+    if (!B || !C) return geo;
+
+    const AB = B.findLinksInto().first();
+    const AC = C.findLinksInto().first();
+    if (!AB || !AC) return geo;
+
+    // ⭐ 强制更新 route（关键）
+    AB.updateRoute();
+    AC.updateRoute();
+
+    // ⭐ 官方唯一可靠数据：points / getPoint :contentReference[oaicite:0]{index=0}
+    if (AB.pointsCount < 2 || AC.pointsCount < 2) return geo;
+
+    const AB_from = AB.getPoint(0);
+    const AB_to   = AB.getPoint(AB.pointsCount - 1);
+
+    const AC_from = AC.getPoint(0);
+    const AC_to   = AC.getPoint(AC.pointsCount - 1);
+
+    this._tValues.forEach(t => {
+      const left  = this.lerp(AB_from, AB_to, t);
+      const right = this.lerp(AC_from, AC_to, t);
+
+      // 🔴 横线
+      const fig = new go.PathFigure(left.x, left.y, false);
+      fig.add(new go.PathSegment(go.PathSegment.Line, right.x, right.y));
+      geo.add(fig);
+
+      // 🔵 调试点（左）
+      this.diagram.add(
+        new go.Part({
+          layerName: "Foreground",
+          selectable: false,
+          position: left
+        }).add(
+          new go.Shape("Circle", {
+            width: 6,
+            height: 6,
+            fill: "blue"
+          })
+        )
+      );
+
+      // 🟢 调试点（右）
+      this.diagram.add(
+        new go.Part({
+          layerName: "Foreground",
+          selectable: false,
+          position: right
+        }).add(
+          new go.Shape("Circle", {
+            width: 6,
+            height: 6,
+            fill: "green"
+          })
+        )
+      );
+    });
+
+    return geo;
+  }
+}
+
+/* ================= Diagram ================= */
+const diagram = $(go.Diagram, "diagramDiv", {
+  "undoManager.isEnabled": true
+});
+
+/* ================= Node ================= */
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    { locationSpot: go.Spot.Center },
+    new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+
+    $(go.Shape, "RoundedRectangle", {
+      fill: "#fff",
+      stroke: "#333",
+      strokeWidth: 2
+    }),
+
+    $(go.TextBlock, { margin: 10 }, new go.Binding("text", "key"))
+  );
+
+/* ================= 普通 Link ================= */
+diagram.linkTemplate =
+  $(go.Link,
+    {
+      selectable: false,
+      routing: go.Routing.Normal,
+      curve: go.Curve.None
+    },
+    $(go.Shape, { stroke: "#333", strokeWidth: 2 })
+  );
+
+/* ================= 梯子 Link ================= */
+diagram.linkTemplateMap.add("ladder",
+  $(LadderLink,
+    $(go.Shape, {
+      stroke: "red",
+      strokeWidth: 3
+    })
+  )
+);
+
+/* ================= Model ================= */
+diagram.model = new go.GraphLinksModel(
+  [
+    { key: "A", loc: "300 80"  },
+    { key: "B", loc: "120 300" },
+    { key: "C", loc: "480 300" }
+  ],
+  [
+    { from: "A", to: "B" },
+    { from: "A", to: "C" },
+    { from: "B", to: "C", category: "ladder" }
+  ]
+);
+
+/* ⭐ 强制在布局后再刷新（关键） */
+diagram.addDiagramListener("LayoutCompleted", () => {
+  diagram.links.each(l => l.updateRoute());
+});
+</script>
+</body>
+</html>
