@@ -1,17 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>LadderLink 最终修复版</title>
-
   <script src="https://cdn.jsdelivr.net/npm/gojs@3.0.24/release/go.js"></script>
-
   <style>
-    html, body, #diagramDiv {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-    }
+    html, body, #diagramDiv { width:100%; height:100%; margin:0; }
   </style>
 </head>
 
@@ -21,7 +14,38 @@
 <script>
 const $ = go.GraphObject.make;
 
-/* ================= 自定义 LadderLink ================= */
+/* ================= 核心：路径插值 ================= */
+function getPointAtFraction(link, t) {
+  const pts = link.points;
+  let total = 0;
+  let segs = [];
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts.get(i);
+    const b = pts.get(i+1);
+    const len = a.distanceSquaredPoint(b) ** 0.5;
+    segs.push({ a, b, len });
+    total += len;
+  }
+
+  let target = total * t;
+  let acc = 0;
+
+  for (let s of segs) {
+    if (acc + s.len >= target) {
+      const ratio = (target - acc) / s.len;
+      return new go.Point(
+        s.a.x + (s.b.x - s.a.x) * ratio,
+        s.a.y + (s.b.y - s.a.y) * ratio
+      );
+    }
+    acc += s.len;
+  }
+
+  return pts.get(pts.length - 1);
+}
+
+/* ================= LadderLink ================= */
 class LadderLink extends go.Link {
   constructor() {
     super();
@@ -30,11 +54,11 @@ class LadderLink extends go.Link {
     this._tValues = [0.2, 0.3, 0.4];
   }
 
-  lerp(p1, p2, t) {
-    return new go.Point(
-      p1.x + (p2.x - p1.x) * t,
-      p1.y + (p2.y - p1.y) * t
-    );
+  computePoints() {
+    this.clearPoints();
+    this.addPoint(new go.Point(0,0));
+    this.addPoint(new go.Point(0,0));
+    return true;
   }
 
   makeGeometry() {
@@ -48,57 +72,18 @@ class LadderLink extends go.Link {
     const AC = C.findLinksInto().first();
     if (!AB || !AC) return geo;
 
-    // ⭐ 强制更新 route（关键）
     AB.updateRoute();
     AC.updateRoute();
 
-    // ⭐ 官方唯一可靠数据：points / getPoint :contentReference[oaicite:0]{index=0}
     if (AB.pointsCount < 2 || AC.pointsCount < 2) return geo;
 
-    const AB_from = AB.getPoint(0);
-    const AB_to   = AB.getPoint(AB.pointsCount - 1);
-
-    const AC_from = AC.getPoint(0);
-    const AC_to   = AC.getPoint(AC.pointsCount - 1);
-
     this._tValues.forEach(t => {
-      const left  = this.lerp(AB_from, AB_to, t);
-      const right = this.lerp(AC_from, AC_to, t);
+      const left  = getPointAtFraction(AB, t);
+      const right = getPointAtFraction(AC, t);
 
-      // 🔴 横线
       const fig = new go.PathFigure(left.x, left.y, false);
       fig.add(new go.PathSegment(go.PathSegment.Line, right.x, right.y));
       geo.add(fig);
-
-      // 🔵 调试点（左）
-      this.diagram.add(
-        new go.Part({
-          layerName: "Foreground",
-          selectable: false,
-          position: left
-        }).add(
-          new go.Shape("Circle", {
-            width: 6,
-            height: 6,
-            fill: "blue"
-          })
-        )
-      );
-
-      // 🟢 调试点（右）
-      this.diagram.add(
-        new go.Part({
-          layerName: "Foreground",
-          selectable: false,
-          position: right
-        }).add(
-          new go.Shape("Circle", {
-            width: 6,
-            height: 6,
-            fill: "green"
-          })
-        )
-      );
     });
 
     return geo;
@@ -110,59 +95,57 @@ const diagram = $(go.Diagram, "diagramDiv", {
   "undoManager.isEnabled": true
 });
 
-/* ================= Node ================= */
+diagram.toolManager.draggingTool.doMouseMove = function() {
+  go.DraggingTool.prototype.doMouseMove.call(this);
+
+  const diagram = this.diagram;
+
+  diagram.links.each(l => {
+    if (l instanceof LadderLink) {
+      l.invalidateRoute();
+    }
+  });
+};
+
+/* Node */
 diagram.nodeTemplate =
   $(go.Node, "Auto",
     { locationSpot: go.Spot.Center },
     new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-
-    $(go.Shape, "RoundedRectangle", {
-      fill: "#fff",
-      stroke: "#333",
-      strokeWidth: 2
-    }),
-
-    $(go.TextBlock, { margin: 10 }, new go.Binding("text", "key"))
+    $(go.Shape, "RoundedRectangle", { fill:"#fff", stroke:"#333", strokeWidth:2 }),
+    $(go.TextBlock, { margin:10 }, new go.Binding("text","key"))
   );
 
-/* ================= 普通 Link ================= */
+/* 普通线 */
 diagram.linkTemplate =
   $(go.Link,
-    {
-      selectable: false,
-      routing: go.Routing.Normal,
-      curve: go.Curve.None
-    },
-    $(go.Shape, { stroke: "#333", strokeWidth: 2 })
+    $(go.Shape, { stroke:"#333", strokeWidth:2 })
   );
 
-/* ================= 梯子 Link ================= */
+/* 梯子 */
 diagram.linkTemplateMap.add("ladder",
   $(LadderLink,
-    $(go.Shape, {
-      stroke: "red",
-      strokeWidth: 3
-    })
+    $(go.Shape, { stroke:"red", strokeWidth:3 })
   )
 );
 
-/* ================= Model ================= */
+/* 数据 */
 diagram.model = new go.GraphLinksModel(
   [
-    { key: "A", loc: "300 80"  },
-    { key: "B", loc: "120 300" },
-    { key: "C", loc: "480 300" }
+    { key:"A", loc:"300 80" },
+    { key:"B", loc:"120 300" },
+    { key:"C", loc:"480 300" }
   ],
   [
-    { from: "A", to: "B" },
-    { from: "A", to: "C" },
-    { from: "B", to: "C", category: "ladder" }
+    { from:"A", to:"B" },
+    { from:"A", to:"C" },
+    { from:"B", to:"C", category:"ladder" }
   ]
 );
 
-/* ⭐ 强制在布局后再刷新（关键） */
+/* 强制刷新 */
 diagram.addDiagramListener("LayoutCompleted", () => {
-  diagram.links.each(l => l.updateRoute());
+  diagram.links.each(l => l.invalidateRoute());
 });
 </script>
 </body>
