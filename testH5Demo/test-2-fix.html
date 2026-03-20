@@ -1,17 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>GoJS 梯子线（最终正确版：固定间距）</title>
-  <script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
-  <style>
-    html, body, #diagramDiv {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-    }
-  </style>
+<meta charset="UTF-8">
+<script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
+<style>
+html,body,#diagramDiv{width:100%;height:100%;margin:0;}
+</style>
 </head>
+
 <body>
 <div id="diagramDiv"></div>
 
@@ -20,35 +16,16 @@ const $ = go.GraphObject.make;
 
 /* ================= 参数 ================= */
 const CONFIG = {
-  gap: 20,            // 平行线间距
-  ladderWidth: 10,    // 梯子宽度
-  startOffset: 60,    // 离节点距离(px)
-  ladderSpacing: 30,  // 梯子间距(px)
-  ladderCount: 2      // 每侧数量
+  gap: 20,
+  ladderWidth: 10,
+  startOffset: 60,
+  ladderSpacing: 30,
+  ladderCount: 2
 };
 
-/* ================= Diagram ================= */
-const diagram = $(go.Diagram, "diagramDiv", {
-  "undoManager.isEnabled": true
-});
+/* ================= 核心Link ================= */
+class SmartLink extends go.Link {
 
-/* ================= Node ================= */
-diagram.nodeTemplate =
-  $(go.Node, "Auto",
-    { locationSpot: go.Spot.Center },
-    new go.Binding("location", "loc", go.Point.parse)
-      .makeTwoWay(go.Point.stringify),
-    $(go.Shape, "RoundedRectangle", {
-      fill: "#fff",
-      stroke: "#333",
-      strokeWidth: 2
-    }),
-    $(go.TextBlock, { margin: 10 },
-      new go.Binding("text"))
-  );
-
-/* ================= Link ================= */
-class ParallelLadderLink extends go.Link {
   computePoints() {
     const A = this.fromNode;
     const B = this.toNode;
@@ -72,37 +49,43 @@ class ParallelLadderLink extends go.Link {
     const ux = dx / len;
     const uy = dy / len;
     const nx = -uy;
-    const ny =  ux;
+    const ny =  uy;
 
     this.clearPoints();
 
     const gap = this.data.gap ?? CONFIG.gap;
     const halfGap = gap / 2;
 
-    /* ===== 平行线 ===== */
+    /* ================= 平行线 ================= */
     if (this.data.kind === "parallel") {
+
       const offset = this.data.index === 0 ? -halfGap : halfGap;
 
       this.addPoint(new go.Point(
         pA.x + nx * offset,
         pA.y + ny * offset
       ));
+
       this.addPoint(new go.Point(
         pB.x + nx * offset,
         pB.y + ny * offset
       ));
     }
 
-    /* ===== 梯子线（关键修复）===== */
-    if (this.data.kind === "ladder") {
+    /* ================= 普通线 ================= */
+    else if (!this.data.kind) {
+      this.addPoint(pA);
+      this.addPoint(pB);
+    }
+
+    /* ================= 梯线 ================= */
+    else if (this.data.kind === "ladder") {
 
       const d = this.data.d;
 
-      // ⭐ A侧 / B侧区分
       const realD = this.data.reverse ? (len - d) : d;
 
       const t = realD / len;
-
       if (t <= 0 || t >= 1) return false;
 
       const ladderHalf = Math.min(
@@ -117,6 +100,7 @@ class ParallelLadderLink extends go.Link {
         cx - nx * ladderHalf,
         cy - ny * ladderHalf
       ));
+
       this.addPoint(new go.Point(
         cx + nx * ladderHalf,
         cy + ny * ladderHalf
@@ -127,30 +111,51 @@ class ParallelLadderLink extends go.Link {
   }
 }
 
-/* ================= Template ================= */
-diagram.linkTemplate =
-  $(ParallelLadderLink,
-    { selectable: false },
-    $(go.Shape, {
-      stroke: "#333",
-      strokeWidth: 2
-    })
+/* ================= Diagram ================= */
+const diagram = $(go.Diagram, "diagramDiv", {
+  "undoManager.isEnabled": true
+});
+
+/* ================= Node ================= */
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    { locationSpot: go.Spot.Center },
+    new go.Binding("location","loc",go.Point.parse).makeTwoWay(go.Point.stringify),
+    $(go.Shape,"RoundedRectangle",{fill:"#fff",stroke:"#333",strokeWidth:2}),
+    $(go.TextBlock,{margin:10},new go.Binding("text","key"))
   );
 
-/* ================= Model ================= */
+/* ================= Link ================= */
+diagram.linkTemplate =
+  $(SmartLink,
+    { selectable:false },
+    $(go.Shape,{stroke:"#333",strokeWidth:2})
+  );
+
+/* ================= 数据 ================= */
 diagram.model = new go.GraphLinksModel(
-  [
-    { key: "A", text: "节点 A", loc: "120 180" },
-    { key: "B", text: "节点 B", loc: "520 260" }
-  ],
-  [
-    { from: "A", to: "B", kind: "parallel", index: 0 },
-    { from: "A", to: "B", kind: "parallel", index: 1 }
-  ]
+[
+  { key:"A", loc:"300 80" },
+  { key:"B", loc:"120 300" },
+  { key:"C", loc:"300 300" },
+  { key:"D", loc:"480 300" }
+],
+[
+  /* 普通 */
+  { from:"A", to:"B" },
+
+  /* AC 平行（拆成两条） */
+  { from:"A", to:"C", kind:"parallel", index:0, id:"AC1" },
+  { from:"A", to:"C", kind:"parallel", index:1, id:"AC2" },
+
+  { from:"B", to:"C", id:"BC" },
+  { from:"C", to:"D", id:"CD" }
+]
 );
 
-/* ================= 梯子生成 ================= */
-function buildLadders() {
+/* ================= 梯线生成 ================= */
+function addLadders(from, to, index) {
+
   const m = diagram.model;
 
   const {
@@ -160,31 +165,39 @@ function buildLadders() {
     ladderWidth
   } = CONFIG;
 
-  for (let i = 0; i < ladderCount; i++) {
-    const d = startOffset + i * ladderSpacing;
+  for (let i=0;i<ladderCount;i++) {
 
-    // A侧
+    const d = startOffset + i*ladderSpacing;
+
     m.addLinkData({
-      from: "A",
-      to: "B",
-      kind: "ladder",
+      from, to,
+      kind:"ladder",
+      index,
       d,
       ladderWidth
     });
 
-    // B侧
     m.addLinkData({
-      from: "A",
-      to: "B",
-      kind: "ladder",
+      from, to,
+      kind:"ladder",
+      index,
       d,
       ladderWidth,
-      reverse: true
+      reverse:true
     });
   }
 }
 
-diagram.addDiagramListener("InitialLayoutCompleted", buildLadders);
+/* ================= 构建梯线 ================= */
+diagram.addDiagramListener("InitialLayoutCompleted", () => {
+
+  // AC1 - BC
+  addLadders("A","C",0);
+
+  // AC2 - CD
+  addLadders("A","C",1);
+
+});
 
 /* ================= 拖动刷新 ================= */
 diagram.addDiagramListener("SelectionMoved", () => {

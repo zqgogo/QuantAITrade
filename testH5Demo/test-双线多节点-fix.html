@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
+<style>
+html,body,#diagramDiv { width:100%; height:100%; margin:0; }
+</style>
+</head>
+<body>
+<div id="diagramDiv"></div>
+
+<script>
+const $ = go.GraphObject.make;
+
+/* ================= 配置 ================= */
+const CONFIG = {
+  gap: 20,  // 平行线之间间距
+  parallel: {   // 节点↔节点平行线梯线默认配置
+    startOffset: 20,
+    ladderSpacing: 15,
+    ladderCount: 3
+  },
+  edgeLadder: { // 边↔边梯线默认配置
+    startOffset: 50,
+    ladderSpacing: 25,
+    ladderCount: 2
+  }
+};
+
+/* ================= 辅助函数 ================= */
+function getSharedNode(l1, l2) {
+  if (l1.fromNode === l2.fromNode) return l1.fromNode;
+  if (l1.fromNode === l2.toNode) return l1.fromNode;
+  if (l1.toNode === l2.fromNode) return l1.toNode;
+  if (l1.toNode === l2.toNode) return l1.toNode;
+  return null;
+}
+
+function getDirFromNode(link, node) {
+  const from = link.fromNode;
+  const to   = link.toNode;
+  const other = (node === from) ? to : from;
+  const v = new go.Point(other.location.x - node.location.x, other.location.y - node.location.y);
+  const len = Math.hypot(v.x, v.y) || 1;
+  return new go.Point(v.x / len, v.y / len);
+}
+
+/* ================= LadderLink（边↔边梯线） ================= */
+class LadderLink extends go.Link {
+  constructor() {
+    super();
+    this.layerName = "Foreground";
+    this.selectable = false;
+  }
+
+  computePoints() {
+    this.clearPoints();
+    this.addPoint(new go.Point(0,0));
+    this.addPoint(new go.Point(0,0));
+    return true;
+  }
+
+  makeGeometry() {
+    const geo = new go.Geometry();
+    const d = this.data;
+    const diagram = this.diagram;
+    if (!d || !d.leftLinkKey || !d.rightLinkKey) return geo;
+
+    const leftLink  = diagram.findLinkForKey(d.leftLinkKey);
+    const rightLink = diagram.findLinkForKey(d.rightLinkKey);
+    if (!leftLink || !rightLink) return geo;
+
+    const shared = getSharedNode(leftLink, rightLink);
+    if (!shared) return geo;
+    const center = shared.location;
+
+    const dir1 = getDirFromNode(leftLink, shared);
+    const dir2 = getDirFromNode(rightLink, shared);
+
+    // 使用独立配置或默认 edgeLadder
+    const base = d.startOffset ?? CONFIG.edgeLadder.startOffset;
+    const spacing = d.ladderSpacing ?? CONFIG.edgeLadder.ladderSpacing;
+    const count = d.ladderCount ?? CONFIG.edgeLadder.ladderCount;
+
+    for (let i=0;i<count;i++) {
+      const dist = base + i*spacing;
+      const p1 = new go.Point(center.x + dir1.x*dist, center.y + dir1.y*dist);
+      const p2 = new go.Point(center.x + dir2.x*dist, center.y + dir2.y*dist);
+
+      // 宽度自动填满
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const nx = -dy;
+      const ny = dx;
+      const len = Math.hypot(nx, ny) || 1;
+      const offset = (i-(count-1)/2)*2; // 小错开
+      const ox = nx/len*offset;
+      const oy = ny/len*offset;
+
+      const s = new go.Point(p1.x+ox, p1.y+oy);
+      const e = new go.Point(p2.x+ox, p2.y+oy);
+
+      const fig = new go.PathFigure(s.x, s.y, false);
+      fig.add(new go.PathSegment(go.PathSegment.Line, e.x, e.y));
+      geo.add(fig);
+    }
+
+    return geo;
+  }
+}
+
+/* ================= SmartLink（节点↔节点平行线 + 梯线） ================= */
+class SmartLink extends go.Link {
+  computePoints() {
+    const A = this.fromNode;
+    const B = this.toNode;
+    if (!A || !B) return false;
+
+    const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
+    const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
+
+    const dx = pB.x - pA.x;
+    const dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return false;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    this.clearPoints();
+    const gap = this.data.gap ?? CONFIG.gap;
+    const halfGap = gap / 2;
+
+    if (this.data.kind === "parallel") {
+      const offset = this.data.index===0 ? -halfGap : halfGap;
+      this.addPoint(new go.Point(pA.x+nx*offset, pA.y+ny*offset));
+      this.addPoint(new go.Point(pB.x+nx*offset, pB.y+ny*offset));
+    } else if (!this.data.kind) {
+      this.addPoint(pA);
+      this.addPoint(pB);
+    } else if (this.data.kind === "ladder") {
+      const d = this.data.d ?? (CONFIG.parallel.startOffset);
+      const t = (this.data.reverse ? (len - d) : d) / len;
+      if (t<=0||t>=1) return false;
+
+      const ladderHalf = halfGap; // 填满平行线间距
+      const cx = pA.x + dx*t;
+      const cy = pA.y + dy*t;
+      this.addPoint(new go.Point(cx - nx*ladderHalf, cy - ny*ladderHalf));
+      this.addPoint(new go.Point(cx + nx*ladderHalf, cy + ny*ladderHalf));
+    }
+
+    return true;
+  }
+}
+
+/* ================= Diagram ================= */
+const diagram = $(go.Diagram, "diagramDiv", { "undoManager.isEnabled": true });
+
+// 拖动实时刷新梯线
+diagram.toolManager.draggingTool.doMouseMove = function() {
+  go.DraggingTool.prototype.doMouseMove.call(this);
+  diagram.links.each(l => {
+    if (l instanceof LadderLink || l.data.kind === "ladder") l.invalidateRoute();
+  });
+};
+
+// Node 模板
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    { locationSpot: go.Spot.Center },
+    new go.Binding("location","loc",go.Point.parse).makeTwoWay(go.Point.stringify),
+    $(go.Shape,"RoundedRectangle",{fill:"#fff",stroke:"#333",strokeWidth:2}),
+    $(go.TextBlock,{margin:10},new go.Binding("text","key"))
+  );
+
+// SmartLink 模板
+diagram.linkTemplate =
+  $(SmartLink, { selectable:false }, $(go.Shape,{stroke:"#333", strokeWidth:2}));
+
+// LadderLink 模板
+diagram.linkTemplateMap.add("ladder",
+  $(LadderLink, $(go.Shape,{stroke:"red", strokeWidth:3})) );
+
+/* ================= 自动生成节点↔节点平行线+梯线函数 ================= */
+function addParallelWithLadders(from, to, count=2, options={}) {
+  const m = diagram.model;
+  const gap = CONFIG.gap;
+  const startOffset = options.startOffset ?? CONFIG.parallel.startOffset;
+  const ladderSpacing = options.ladderSpacing ?? CONFIG.parallel.ladderSpacing;
+  const ladderCount = options.ladderCount ?? CONFIG.parallel.ladderCount;
+
+  for (let i=0;i<count;i++) {
+    m.addLinkData({ from, to, kind:"parallel", index:i, gap });
+    for (let j=0;j<ladderCount;j++) {
+      const d = startOffset + j*ladderSpacing;
+      m.addLinkData({ from, to, kind:"ladder", index:i, d });
+      m.addLinkData({ from, to, kind:"ladder", index:i, d, reverse:true });
+    }
+  }
+}
+
+/* ================= 初始化数据 ================= */
+const model = new go.GraphLinksModel(
+  [
+    { key:"A", loc:"300 80" },
+    { key:"B", loc:"120 300" },
+    { key:"C", loc:"300 300" },
+    { key:"D", loc:"480 300" }
+  ],
+  [
+    { key:"L1", from:"A", to:"B" },
+    { key:"L2", from:"A", to:"C" },
+    { key:"L3", from:"A", to:"D" },
+    { key:"L4", from:"B", to:"C" },
+
+    // 两边梯线（3点梯线），可单独配置参数
+    { category:"ladder", leftLinkKey:"L1", rightLinkKey:"L2", startOffset:30, ladderSpacing:20, ladderCount:3 },
+    { category:"ladder", leftLinkKey:"L1", rightLinkKey:"L4" },
+    { category:"ladder", leftLinkKey:"L4", rightLinkKey:"L2" },
+    { category:"ladder", leftLinkKey:"L2", rightLinkKey:"L3" }
+  ]
+);
+
+model.linkKeyProperty = "key";
+diagram.model = model;
+
+// 自动生成 AC 两条平行线 + 梯线（节点↔节点）并可单独配置
+diagram.addDiagramListener("InitialLayoutCompleted", () => {
+  addParallelWithLadders("A","C", 2, { startOffset:20, ladderSpacing:15, ladderCount:3 });
+  addParallelWithLadders("D","C", 2, { startOffset:20, ladderSpacing:15, ladderCount:3 });
+  diagram.links.each(l => l.invalidateRoute());
+});
+</script>
+</body>
+</html>
