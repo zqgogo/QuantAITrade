@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>GoJS 梯子线（最终正确版：固定间距）</title>
+  <script src="https://unpkg.com/gojs@3.0.24/release/go.js"></script>
+  <style>
+    html, body, #diagramDiv {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="diagramDiv"></div>
+
+<script>
+const $ = go.GraphObject.make;
+
+/* ================= 参数 ================= */
+const CONFIG = {
+  gap: 20,            // 平行线间距
+  ladderWidth: 10,    // 梯子宽度
+  startOffset: 60,    // 离节点距离(px)
+  ladderSpacing: 30,  // 梯子间距(px)
+  ladderCount: 2      // 每侧数量
+};
+
+/* ================= Diagram ================= */
+const diagram = $(go.Diagram, "diagramDiv", {
+  "undoManager.isEnabled": true
+});
+
+/* ================= Node ================= */
+diagram.nodeTemplate =
+  $(go.Node, "Auto",
+    { locationSpot: go.Spot.Center },
+    new go.Binding("location", "loc", go.Point.parse)
+      .makeTwoWay(go.Point.stringify),
+    $(go.Shape, "RoundedRectangle", {
+      fill: "#fff",
+      stroke: "#333",
+      strokeWidth: 2
+    }),
+    $(go.TextBlock, { margin: 10 },
+      new go.Binding("text"))
+  );
+
+/* ================= Link ================= */
+class ParallelLadderLink extends go.Link {
+  computePoints() {
+    const A = this.fromNode;
+    const B = this.toNode;
+    if (!A || !B) return false;
+
+    const pA = this.getLinkPoint(
+      A, this.fromPort, this.computeSpot(true),
+      true, false, B, this.toPort
+    );
+
+    const pB = this.getLinkPoint(
+      B, this.toPort, this.computeSpot(false),
+      false, false, A, this.fromPort
+    );
+
+    const dx = pB.x - pA.x;
+    const dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return false;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny =  ux;
+
+    this.clearPoints();
+
+    const gap = this.data.gap ?? CONFIG.gap;
+    const halfGap = gap / 2;
+
+    /* ===== 平行线 ===== */
+    if (this.data.kind === "parallel") {
+      const offset = this.data.index === 0 ? -halfGap : halfGap;
+
+      this.addPoint(new go.Point(
+        pA.x + nx * offset,
+        pA.y + ny * offset
+      ));
+      this.addPoint(new go.Point(
+        pB.x + nx * offset,
+        pB.y + ny * offset
+      ));
+    }
+
+    /* ===== 梯子线（关键修复）===== */
+    if (this.data.kind === "ladder") {
+
+      const d = this.data.d;
+
+      // ⭐ A侧 / B侧区分
+      const realD = this.data.reverse ? (len - d) : d;
+
+      const t = realD / len;
+
+      if (t <= 0 || t >= 1) return false;
+
+      const ladderHalf = Math.min(
+        this.data.ladderWidth ?? CONFIG.ladderWidth,
+        halfGap
+      );
+
+      const cx = pA.x + dx * t;
+      const cy = pA.y + dy * t;
+
+      this.addPoint(new go.Point(
+        cx - nx * ladderHalf,
+        cy - ny * ladderHalf
+      ));
+      this.addPoint(new go.Point(
+        cx + nx * ladderHalf,
+        cy + ny * ladderHalf
+      ));
+    }
+
+    return true;
+  }
+}
+
+/* ================= Template ================= */
+diagram.linkTemplate =
+  $(ParallelLadderLink,
+    { selectable: false },
+    $(go.Shape, {
+      stroke: "#333",
+      strokeWidth: 2
+    })
+  );
+
+/* ================= Model ================= */
+diagram.model = new go.GraphLinksModel(
+  [
+    { key: "A", text: "节点 A", loc: "120 180" },
+    { key: "B", text: "节点 B", loc: "520 260" }
+  ],
+  [
+    { from: "A", to: "B", kind: "parallel", index: 0 },
+    { from: "A", to: "B", kind: "parallel", index: 1 }
+  ]
+);
+
+/* ================= 梯子生成 ================= */
+function buildLadders() {
+  const m = diagram.model;
+
+  const {
+    startOffset,
+    ladderSpacing,
+    ladderCount,
+    ladderWidth
+  } = CONFIG;
+
+  for (let i = 0; i < ladderCount; i++) {
+    const d = startOffset + i * ladderSpacing;
+
+    // A侧
+    m.addLinkData({
+      from: "A",
+      to: "B",
+      kind: "ladder",
+      d,
+      ladderWidth
+    });
+
+    // B侧
+    m.addLinkData({
+      from: "A",
+      to: "B",
+      kind: "ladder",
+      d,
+      ladderWidth,
+      reverse: true
+    });
+  }
+}
+
+diagram.addDiagramListener("InitialLayoutCompleted", buildLadders);
+
+/* ================= 拖动刷新 ================= */
+diagram.addDiagramListener("SelectionMoved", () => {
+  diagram.links.each(l => l.invalidateRoute());
+});
+</script>
+</body>
+</html>
