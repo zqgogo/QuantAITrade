@@ -14,7 +14,7 @@
 <script>
 const $ = go.GraphObject.make;
 
-/* ================= 核心：路径插值 ================= */
+/* ================= 工具：路径插值 ================= */
 function getPointAtFraction(link, t) {
   const pts = link.points;
   let total = 0;
@@ -23,7 +23,7 @@ function getPointAtFraction(link, t) {
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts.get(i);
     const b = pts.get(i+1);
-    const len = a.distanceSquaredPoint(b) ** 0.5;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
     segs.push({ a, b, len });
     total += len;
   }
@@ -45,13 +45,39 @@ function getPointAtFraction(link, t) {
   return pts.get(pts.length - 1);
 }
 
+/* ================= 工具：安全查找 link ================= */
+
+/* 推荐：用 key（官方支持） */
+function findLinkByKey(diagram, key) {
+  if (!key) return null;
+  return diagram.findLinkForKey(key); // 官方 API
+}
+
+/* 备用：from-to 查找（Iterator 正确写法） */
+function findLink(diagram, from, to) {
+  let result = null;
+
+  diagram.links.each(l => {
+    if (l.category === "ladder") return; // ❗避免递归
+
+    if (
+      l.fromNode?.data.key === from &&
+      l.toNode?.data.key === to
+    ) {
+      result = l;
+    }
+  });
+
+  return result;
+}
+
 /* ================= LadderLink ================= */
 class LadderLink extends go.Link {
   constructor() {
     super();
     this.layerName = "Foreground";
     this.selectable = false;
-    this._tValues = [0.2, 0.3, 0.4];
+    this._tValues = [0.2, 0.4, 0.6, 0.8];
   }
 
   computePoints() {
@@ -63,23 +89,34 @@ class LadderLink extends go.Link {
 
   makeGeometry() {
     const geo = new go.Geometry();
+    const data = this.data;
+    const diagram = this.diagram;
+    if (!data) return geo;
 
-    const B = this.fromNode;
-    const C = this.toNode;
-    if (!B || !C) return geo;
+    let leftLink, rightLink;
 
-    const AB = B.findLinksInto().first();
-    const AC = C.findLinksInto().first();
-    if (!AB || !AC) return geo;
+    /* ⭐ 优先用 key（推荐方式） */
+    if (data.leftLinkKey && data.rightLinkKey) {
+      leftLink  = findLinkByKey(diagram, data.leftLinkKey);
+      rightLink = findLinkByKey(diagram, data.rightLinkKey);
+    } else {
+      leftLink  = findLink(diagram, data.leftFrom, data.leftTo);
+      rightLink = findLink(diagram, data.rightFrom, data.rightTo);
+    }
 
-    AB.updateRoute();
-    AC.updateRoute();
+    /* 安全保护 */
+    if (!leftLink || !rightLink) return geo;
+    if (leftLink instanceof LadderLink) return geo;
+    if (rightLink instanceof LadderLink) return geo;
 
-    if (AB.pointsCount < 2 || AC.pointsCount < 2) return geo;
+    leftLink.updateRoute();
+    rightLink.updateRoute();
+
+    if (leftLink.pointsCount < 2 || rightLink.pointsCount < 2) return geo;
 
     this._tValues.forEach(t => {
-      const left  = getPointAtFraction(AB, t);
-      const right = getPointAtFraction(AC, t);
+      const left  = getPointAtFraction(leftLink, t);
+      const right = getPointAtFraction(rightLink, t);
 
       const fig = new go.PathFigure(left.x, left.y, false);
       fig.add(new go.PathSegment(go.PathSegment.Line, right.x, right.y));
@@ -95,10 +132,9 @@ const diagram = $(go.Diagram, "diagramDiv", {
   "undoManager.isEnabled": true
 });
 
+/* ⭐ 拖拽实时刷新 */
 diagram.toolManager.draggingTool.doMouseMove = function() {
   go.DraggingTool.prototype.doMouseMove.call(this);
-
-  const diagram = this.diagram;
 
   diagram.links.each(l => {
     if (l instanceof LadderLink) {
@@ -107,7 +143,7 @@ diagram.toolManager.draggingTool.doMouseMove = function() {
   });
 };
 
-/* Node */
+/* ================= Node ================= */
 diagram.nodeTemplate =
   $(go.Node, "Auto",
     { locationSpot: go.Spot.Center },
@@ -116,34 +152,53 @@ diagram.nodeTemplate =
     $(go.TextBlock, { margin:10 }, new go.Binding("text","key"))
   );
 
-/* 普通线 */
+/* ================= 普通 Link ================= */
 diagram.linkTemplate =
   $(go.Link,
     $(go.Shape, { stroke:"#333", strokeWidth:2 })
   );
 
-/* 梯子 */
+/* ================= Ladder ================= */
 diagram.linkTemplateMap.add("ladder",
   $(LadderLink,
     $(go.Shape, { stroke:"red", strokeWidth:3 })
   )
 );
 
-/* 数据 */
-diagram.model = new go.GraphLinksModel(
+/* ================= 数据 ================= */
+const model = new go.GraphLinksModel(
   [
     { key:"A", loc:"300 80" },
     { key:"B", loc:"120 300" },
-    { key:"C", loc:"480 300" }
+    { key:"C", loc:"300 300" },
+    { key:"D", loc:"480 300" }
   ],
   [
-    { from:"A", to:"B" },
-    { from:"A", to:"C" },
-    { from:"B", to:"C", category:"ladder" }
+    { key:"L1", from:"A", to:"B" },
+    { key:"L2", from:"A", to:"C" },
+    { key:"L3", from:"A", to:"D" },
+    { key:"L4", from:"B", to:"C" },
+
+    {
+      category:"ladder",
+      leftLinkKey:"L1",
+      rightLinkKey:"L2"
+    },
+    {
+      category:"ladder",
+      leftLinkKey:"L4",
+      rightLinkKey:"L2"
+    }
   ]
 );
 
-/* 强制刷新 */
+/* ⭐ 就加在这里 */
+model.linkKeyProperty = "key";
+
+/* ⭐ 然后再赋值 */
+diagram.model = model;
+
+/* 初始化刷新 */
 diagram.addDiagramListener("LayoutCompleted", () => {
   diagram.links.each(l => l.invalidateRoute());
 });
