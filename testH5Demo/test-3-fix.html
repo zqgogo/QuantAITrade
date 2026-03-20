@@ -14,64 +14,33 @@
 <script>
 const $ = go.GraphObject.make;
 
-/* ================= 工具：路径插值 ================= */
-function getPointAtFraction(link, t) {
-  const pts = link.points;
-  let total = 0;
-  let segs = [];
-
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts.get(i);
-    const b = pts.get(i+1);
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    segs.push({ a, b, len });
-    total += len;
-  }
-
-  let target = total * t;
-  let acc = 0;
-
-  for (let s of segs) {
-    if (acc + s.len >= target) {
-      const ratio = (target - acc) / s.len;
-      return new go.Point(
-        s.a.x + (s.b.x - s.a.x) * ratio,
-        s.a.y + (s.b.y - s.a.y) * ratio
-      );
-    }
-    acc += s.len;
-  }
-
-  return pts.get(pts.length - 1);
+/* ================= 核心：找公共顶点 ================= */
+function getSharedNode(l1, l2) {
+  if (l1.fromNode === l2.fromNode) return l1.fromNode;
+  if (l1.fromNode === l2.toNode)   return l1.fromNode;
+  if (l1.toNode   === l2.fromNode) return l1.toNode;
+  if (l1.toNode   === l2.toNode)   return l1.toNode;
+  return null;
 }
 
-/* ================= 工具：安全查找 link ================= */
+/* ================= 核心：从顶点出发方向 ================= */
+function getDirFromNode(link, node) {
+  const from = link.fromNode;
+  const to   = link.toNode;
 
-/* 推荐：用 key（官方支持） */
-function findLinkByKey(diagram, key) {
-  if (!key) return null;
-  return diagram.findLinkForKey(key); // 官方 API
+  const other = (node === from) ? to : from;
+
+  const v = new go.Point(
+    other.location.x - node.location.x,
+    other.location.y - node.location.y
+  );
+
+  const len = Math.hypot(v.x, v.y) || 1;
+
+  return new go.Point(v.x / len, v.y / len);
 }
 
-/* 备用：from-to 查找（Iterator 正确写法） */
-function findLink(diagram, from, to) {
-  let result = null;
-
-  diagram.links.each(l => {
-    if (l.category === "ladder") return; // ❗避免递归
-
-    if (
-      l.fromNode?.data.key === from &&
-      l.toNode?.data.key === to
-    ) {
-      result = l;
-    }
-  });
-
-  return result;
-}
-
-/* ================= LadderLink ================= */
+/* ================= LadderLink（最终版） ================= */
 class LadderLink extends go.Link {
   constructor() {
     super();
@@ -99,48 +68,43 @@ class LadderLink extends go.Link {
     if (leftLink instanceof LadderLink) return geo;
     if (rightLink instanceof LadderLink) return geo;
 
-    /* ⭐ 只用 node 坐标（核心：完全独立） */
-    const A1 = leftLink.fromNode.location;
-    const B1 = leftLink.toNode.location;
+    /* ⭐ 核心：找公共顶点 */
+    const shared = getSharedNode(leftLink, rightLink);
+    if (!shared) return geo;
 
-    const A2 = rightLink.fromNode.location;
-    const B2 = rightLink.toNode.location;
+    const center = shared.location;
 
-    /* ⭐ 各自独立方向 */
-    const v1 = new go.Point(B1.x - A1.x, B1.y - A1.y);
-    const v2 = new go.Point(B2.x - A2.x, B2.y - A2.y);
+    /* ⭐ 两个方向（从同一个顶点出发） */
+    const dir1 = getDirFromNode(leftLink, shared);
+    const dir2 = getDirFromNode(rightLink, shared);
 
-    const len1 = Math.hypot(v1.x, v1.y) || 1;
-    const len2 = Math.hypot(v2.x, v2.y) || 1;
+    /* ⭐ 每组独立：只由“这两条线”决定 */
+    const distances = [15, 25, 35];
 
-    const dir1 = new go.Point(v1.x / len1, v1.y / len1);
-    const dir2 = new go.Point(v2.x / len2, v2.y / len2);
+    distances.forEach((dist, i) => {
 
-    /* ⭐ 每组独立（不用共享 t） */
-    const base = [20, 30, 40]; // 距离起点的像素
-
-    base.forEach((dist, i) => {
-
-      /* ⭐ 各自从自己的起点走 */
       const p1 = new go.Point(
-        A1.x + dir1.x * dist,
-        A1.y + dir1.y * dist
+        center.x + dir1.x * dist,
+        center.y + dir1.y * dist
       );
 
       const p2 = new go.Point(
-        A2.x + dir2.x * dist,
-        A2.y + dir2.y * dist
+        center.x + dir2.x * dist,
+        center.y + dir2.y * dist
       );
 
-      /* ⭐ 轻微错开 */
-      const nx = -(p2.y - p1.y);
-      const ny =  (p2.x - p1.x);
-      const nlen = Math.hypot(nx, ny) || 1;
+      /* 轻微错开 */
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+
+      const nx = -dy;
+      const ny = dx;
+      const len = Math.hypot(nx, ny) || 1;
 
       const offset = (i - 1) * 2;
 
-      const ox = nx / nlen * offset;
-      const oy = ny / nlen * offset;
+      const ox = nx / len * offset;
+      const oy = ny / len * offset;
 
       const s = new go.Point(p1.x + ox, p1.y + oy);
       const e = new go.Point(p2.x + ox, p2.y + oy);
@@ -159,18 +123,16 @@ const diagram = $(go.Diagram, "diagramDiv", {
   "undoManager.isEnabled": true
 });
 
-/* ⭐ 拖拽实时刷新 */
+/* 拖拽刷新 */
 diagram.toolManager.draggingTool.doMouseMove = function() {
   go.DraggingTool.prototype.doMouseMove.call(this);
 
   diagram.links.each(l => {
-    if (l instanceof LadderLink) {
-      l.invalidateRoute();
-    }
+    if (l instanceof LadderLink) l.invalidateRoute();
   });
 };
 
-/* ================= Node ================= */
+/* Node */
 diagram.nodeTemplate =
   $(go.Node, "Auto",
     { locationSpot: go.Spot.Center },
@@ -179,20 +141,20 @@ diagram.nodeTemplate =
     $(go.TextBlock, { margin:10 }, new go.Binding("text","key"))
   );
 
-/* ================= 普通 Link ================= */
+/* 普通 Link */
 diagram.linkTemplate =
   $(go.Link,
     $(go.Shape, { stroke:"#333", strokeWidth:2 })
   );
 
-/* ================= Ladder ================= */
+/* Ladder */
 diagram.linkTemplateMap.add("ladder",
   $(LadderLink,
     $(go.Shape, { stroke:"red", strokeWidth:3 })
   )
 );
 
-/* ================= 数据 ================= */
+/* 数据 */
 const model = new go.GraphLinksModel(
   [
     { key:"A", loc:"300 80" },
@@ -206,34 +168,16 @@ const model = new go.GraphLinksModel(
     { key:"L3", from:"A", to:"D" },
     { key:"L4", from:"B", to:"C" },
 
-    {
-  category:"ladder",
-  leftLinkKey:"L1",
-  rightLinkKey:"L2",
-  offset: 0
-},
-{
-  category:"ladder",
-  leftLinkKey:"L4",
-  rightLinkKey:"L2",
-  offset: 0.02
-},
-{
-  category:"ladder",
-  leftLinkKey:"L2",
-  rightLinkKey:"L3",
-  offset: 0.04   // ⭐ AC ↔ AD
-}
+    { category:"ladder", leftLinkKey:"L1", rightLinkKey:"L2" }, // AB-AC
+    { category:"ladder", leftLinkKey:"L4", rightLinkKey:"L2" }, // BC-AC（重点修好）
+    { category:"ladder", leftLinkKey:"L2", rightLinkKey:"L3" }  // AC-AD
   ]
 );
 
-/* ⭐ 就加在这里 */
 model.linkKeyProperty = "key";
-
-/* ⭐ 然后再赋值 */
 diagram.model = model;
 
-/* 初始化刷新 */
+/* 初始化 */
 diagram.addDiagramListener("LayoutCompleted", () => {
   diagram.links.each(l => l.invalidateRoute());
 });
