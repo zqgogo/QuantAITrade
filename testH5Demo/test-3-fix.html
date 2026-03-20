@@ -79,7 +79,14 @@ class LadderLink extends go.Link {
     const dir2 = getDirFromNode(rightLink, shared);
 
     /* ⭐ 每组独立：只由“这两条线”决定 */
-    const distances = [15, 25, 35];
+    const base = 50;        // ⭐ 起始距离（离顶点）
+    const gap  = 15;        // ⭐ 每条间距
+
+    const distances = [
+      base,
+      base + gap,
+      base + gap * 2
+    ];
 
     distances.forEach((dist, i) => {
 
@@ -169,6 +176,7 @@ const model = new go.GraphLinksModel(
     { key:"L4", from:"B", to:"C" },
 
     { category:"ladder", leftLinkKey:"L1", rightLinkKey:"L2" }, // AB-AC
+    { category:"ladder", leftLinkKey:"L1", rightLinkKey:"L4" }, // AB-AD
     { category:"ladder", leftLinkKey:"L4", rightLinkKey:"L2" }, // BC-AC（重点修好）
     { category:"ladder", leftLinkKey:"L2", rightLinkKey:"L3" }  // AC-AD
   ]
