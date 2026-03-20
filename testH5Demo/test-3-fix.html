@@ -77,7 +77,6 @@ class LadderLink extends go.Link {
     super();
     this.layerName = "Foreground";
     this.selectable = false;
-    this._tValues = [0.2, 0.4, 0.6, 0.8];
   }
 
   computePoints() {
@@ -89,37 +88,65 @@ class LadderLink extends go.Link {
 
   makeGeometry() {
     const geo = new go.Geometry();
-    const data = this.data;
+    const d = this.data;
     const diagram = this.diagram;
-    if (!data) return geo;
+    if (!d) return geo;
 
-    let leftLink, rightLink;
+    const leftLink  = diagram.findLinkForKey(d.leftLinkKey);
+    const rightLink = diagram.findLinkForKey(d.rightLinkKey);
 
-    /* ⭐ 优先用 key（推荐方式） */
-    if (data.leftLinkKey && data.rightLinkKey) {
-      leftLink  = findLinkByKey(diagram, data.leftLinkKey);
-      rightLink = findLinkByKey(diagram, data.rightLinkKey);
-    } else {
-      leftLink  = findLink(diagram, data.leftFrom, data.leftTo);
-      rightLink = findLink(diagram, data.rightFrom, data.rightTo);
-    }
-
-    /* 安全保护 */
     if (!leftLink || !rightLink) return geo;
     if (leftLink instanceof LadderLink) return geo;
     if (rightLink instanceof LadderLink) return geo;
 
-    leftLink.updateRoute();
-    rightLink.updateRoute();
+    /* ⭐ 只用 node 坐标（核心：完全独立） */
+    const A1 = leftLink.fromNode.location;
+    const B1 = leftLink.toNode.location;
 
-    if (leftLink.pointsCount < 2 || rightLink.pointsCount < 2) return geo;
+    const A2 = rightLink.fromNode.location;
+    const B2 = rightLink.toNode.location;
 
-    this._tValues.forEach(t => {
-      const left  = getPointAtFraction(leftLink, t);
-      const right = getPointAtFraction(rightLink, t);
+    /* ⭐ 各自独立方向 */
+    const v1 = new go.Point(B1.x - A1.x, B1.y - A1.y);
+    const v2 = new go.Point(B2.x - A2.x, B2.y - A2.y);
 
-      const fig = new go.PathFigure(left.x, left.y, false);
-      fig.add(new go.PathSegment(go.PathSegment.Line, right.x, right.y));
+    const len1 = Math.hypot(v1.x, v1.y) || 1;
+    const len2 = Math.hypot(v2.x, v2.y) || 1;
+
+    const dir1 = new go.Point(v1.x / len1, v1.y / len1);
+    const dir2 = new go.Point(v2.x / len2, v2.y / len2);
+
+    /* ⭐ 每组独立（不用共享 t） */
+    const base = [20, 30, 40]; // 距离起点的像素
+
+    base.forEach((dist, i) => {
+
+      /* ⭐ 各自从自己的起点走 */
+      const p1 = new go.Point(
+        A1.x + dir1.x * dist,
+        A1.y + dir1.y * dist
+      );
+
+      const p2 = new go.Point(
+        A2.x + dir2.x * dist,
+        A2.y + dir2.y * dist
+      );
+
+      /* ⭐ 轻微错开 */
+      const nx = -(p2.y - p1.y);
+      const ny =  (p2.x - p1.x);
+      const nlen = Math.hypot(nx, ny) || 1;
+
+      const offset = (i - 1) * 2;
+
+      const ox = nx / nlen * offset;
+      const oy = ny / nlen * offset;
+
+      const s = new go.Point(p1.x + ox, p1.y + oy);
+      const e = new go.Point(p2.x + ox, p2.y + oy);
+
+      const fig = new go.PathFigure(s.x, s.y, false);
+      fig.add(new go.PathSegment(go.PathSegment.Line, e.x, e.y));
       geo.add(fig);
     });
 
@@ -180,15 +207,23 @@ const model = new go.GraphLinksModel(
     { key:"L4", from:"B", to:"C" },
 
     {
-      category:"ladder",
-      leftLinkKey:"L1",
-      rightLinkKey:"L2"
-    },
-    {
-      category:"ladder",
-      leftLinkKey:"L4",
-      rightLinkKey:"L2"
-    }
+  category:"ladder",
+  leftLinkKey:"L1",
+  rightLinkKey:"L2",
+  offset: 0
+},
+{
+  category:"ladder",
+  leftLinkKey:"L4",
+  rightLinkKey:"L2",
+  offset: 0.02
+},
+{
+  category:"ladder",
+  leftLinkKey:"L2",
+  rightLinkKey:"L3",
+  offset: 0.04   // ⭐ AC ↔ AD
+}
   ]
 );
 
