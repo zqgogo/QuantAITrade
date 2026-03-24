@@ -13,54 +13,89 @@ html,body,#diagramDiv { width:100%; height:100%; margin:0; }
 <script>
 const $ = go.GraphObject.make;
 
-/* ================= 1. 配置中心 ================= */
+/* ================= 1. 统一参数配置中心 ================= */
 const CONFIG = {
-  gap: 20,              
-  edgeLadder: {         // 红色跨边梯线
-    startOffset: 50,    
-    ladderSpacing: 20,  
-    ladderCount: 2      
+  gap: 20,              // 两根平行线之间的间距
+  edgeLadder: {         // 红色跨边梯线（红线）的默认参数
+    startOffset: 50,    // 距离共享节点的起始距离
+    ladderSpacing: 20,  // 红线组内部的线条间距
+    ladderCount: 2      // 绘制多少根红杠
   },
-  internalLadder: {     // 黑色平行线内部梯级 (在这里改，全局生效)
-    startOffset: 20,    
-    ladderSpacing: 15,  
-    ladderCount: 3      
+  internalLadder: {     // 平行线内部梯级（黑色短杠）的默认参数
+    startOffset: 15,    // 距离端点的偏移量
+    ladderSpacing: 12,  // 线条之间的间距
+    ladderCount: 4      // 每一端绘制多少根黑杠
   }
 };
 
-/* ================= 2. 辅助函数 ================= */
-function getDirFromNode(link, node) {
-  const other = (node === link.fromNode) ? link.toNode : link.fromNode;
-  const dx = other.location.x - node.location.x;
-  const dy = other.location.y - node.location.y;
-  const len = Math.hypot(dx, dy) || 1;
-  return new go.Point(dx / len, dy / len);
+/* ================= 2. 核心类：SmartLink (处理轨道及内部梯级) ================= */
+class SmartLink extends go.Link {
+  constructor() { super(); }
+
+  // 重写路径计算逻辑
+  computePoints() {
+    const A = this.fromNode, B = this.toNode;
+    if (!A || !B) return false;
+
+    // 获取端口的基础位置
+    const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
+    const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
+    const dx = pB.x - pA.x, dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len; // 获取垂直于连线的法线单位向量
+
+    this.clearPoints(); // 核心：清空默认路径，确保不会画出中轴线
+    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
+
+    if (this.data.kind === "parallel") {
+      // 场景：绘制偏移的平行轨道
+      // 根据 index (0或1) 决定向左还是向右偏移
+      const offset = this.data.index === 0 ? -halfGap : halfGap;
+      this.addPoint(new go.Point(pA.x + nx * offset, pA.y + ny * offset));
+      this.addPoint(new go.Point(pB.x + nx * offset, pB.y + ny * offset));
+    } else if (this.data.kind === "ladder") {
+      // 场景：绘制轨道内部的黑色短横木
+      const d = this.data.d ?? 20; // 距离端点的距离
+      const t = (this.data.reverse ? (len - d) : d) / len; // 计算插值比例
+      const cx = pA.x + dx * t, cy = pA.y + dy * t; // 确定中心点
+      // 绘制横跨两条轨道的短线
+      this.addPoint(new go.Point(cx - halfGap * nx, cy - halfGap * ny));
+      this.addPoint(new go.Point(cx + halfGap * nx, cy + halfGap * ny));
+    } else {
+      // 场景：普通线（不带 kind 属性），正常画中轴线
+      this.addPoint(pA); this.addPoint(pB);
+    }
+    return true;
+  }
 }
 
-function getSharedNode(l1, l2) {
-  if (l1.fromNode===l2.fromNode || l1.fromNode===l2.toNode) return l1.fromNode;
-  if (l1.toNode===l2.fromNode || l1.toNode===l2.toNode) return l1.toNode;
-  return null;
-}
-
-/* ================= 3. LadderLink (红线) ================= */
+/* ================= 3. 核心类：LadderLink (处理红色跨边梯线) ================= */
 class LadderLink extends go.Link {
-  constructor() { super(); this.layerName = "Foreground"; this.selectable = false; }
+  constructor() { 
+    super(); 
+    this.layerName = "Foreground"; // 置于顶层
+    this.selectable = false;       // 不可选中
+  }
+
+  // 占位函数：不绘制 Link 默认路径
   computePoints() { this.clearPoints(); this.addPoint(new go.Point(0,0)); this.addPoint(new go.Point(0,0)); return true; }
+
+  // 自定义绘制多根梯线
   makeGeometry() {
     const geo = new go.Geometry();
     const left = this.diagram.findLinkForKey(this.data.leftLinkKey);
     const right = this.diagram.findLinkForKey(this.data.rightLinkKey);
     if (!left || !right) return geo;
-    const shared = getSharedNode(left, right);
-    if (!shared) return geo;
 
+    // 寻找这两条线的公共交点
+    const shared = (left.fromNode===right.fromNode || left.fromNode===right.toNode) ? left.fromNode : left.toNode;
     const count = this.data.ladderCount ?? CONFIG.edgeLadder.ladderCount;
     const base = this.data.startOffset ?? CONFIG.edgeLadder.startOffset;
     const spacing = this.data.ladderSpacing ?? CONFIG.edgeLadder.ladderSpacing;
 
     for (let i=0; i<count; i++) {
       const dist = base + i * spacing;
+      // 关键：getSmartPoint 会自动吸附物理距离最近的平行线边缘
       const p1 = this.getSmartPoint(left, right, shared, dist);
       const p2 = this.getSmartPoint(right, left, shared, dist);
       const fig = new go.PathFigure(p1.x, p1.y, false);
@@ -69,99 +104,106 @@ class LadderLink extends go.Link {
     }
     return geo;
   }
+
+  // 核心逻辑：自动判断并偏移坐标
   getSmartPoint(link, otherLink, shared, dist) {
-    const dir = getDirFromNode(link, shared);
-    const len = Math.hypot(link.toNode.location.x-link.fromNode.location.x, link.toNode.location.y-link.fromNode.location.y) || 1;
+    const otherNode = (link.fromNode === shared) ? link.toNode : link.fromNode;
+    const dx = otherNode.location.x - shared.location.x, dy = otherNode.location.y - shared.location.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const dir = new go.Point(dx/len, dy/len); // 本条线的方向
     let pt = new go.Point(shared.location.x + dir.x * dist, shared.location.y + dir.y * dist);
+
+    // 如果该边是平行线，执行智能偏移
     if (link.data.kind === "parallel") {
-      const nx = -dir.y, ny = dir.x;
+      const nx = -dir.y, ny = dir.x; // 获取法线
       const halfGap = (link.data.gap ?? CONFIG.gap) / 2;
-      const otherDir = getDirFromNode(otherLink, shared);
-      const offset = (nx * otherDir.x + ny * otherDir.y > 0) ? halfGap : -halfGap;
+      // 获取另一条线的方向，通过点积判断夹角
+      const oOtherNode = (otherLink.fromNode === shared) ? otherLink.toNode : otherLink.fromNode;
+      const oDx = oOtherNode.location.x - shared.location.x, oDy = oOtherNode.location.y - shared.location.y;
+      const oLen = Math.hypot(oDx, oDy) || 1;
+      // 如果法线与另一条线的夹角是钝角，则取负偏移，使其靠近对方
+      const offset = (nx * (oDx/oLen) + ny * (oDy/oLen) > 0) ? halfGap : -halfGap;
       pt.offset(nx * offset, ny * offset);
     }
     return pt;
   }
 }
 
-/* ================= 4. SmartLink (轨道与黑梯级) ================= */
-class SmartLink extends go.Link {
-  computePoints() {
-    const A = this.fromNode, B = this.toNode;
-    if (!A || !B) return false;
-    const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
-    const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
-    const dx = pB.x - pA.x, dy = pB.y - pA.y, len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len;
-    this.clearPoints();
-    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
+/* ================= 4. 封装函数：一键转换平行线 ================= */
+/**
+ * convertLinkToParallel: 将 Model 中的普通 Link 自动转换为双平行轨道结构
+ * 会自动处理：1.删除原中线 2.生成两侧物理轨道 3.生成内部梯级
+ */
+function convertLinkToParallel(linkKey, customOpts = {}) {
+  const m = diagram.model;
+  const oldData = m.findLinkDataForKey(linkKey);
+  if (!oldData) return;
 
-    if (this.data.kind === "parallel") {
-      const offset = this.data.index === 0 ? -halfGap : halfGap;
-      this.addPoint(new go.Point(pA.x + nx * offset, pA.y + ny * offset));
-      this.addPoint(new go.Point(pB.x + nx * offset, pB.y + ny * offset));
-    } else if (this.data.kind === "ladder") {
-      const d = this.data.d ?? 20;
-      const t = (this.data.reverse ? (len - d) : d) / len;
-      const cx = pA.x + dx * t, cy = pA.y + dy * t;
-      this.addPoint(new go.Point(cx - halfGap * nx, cy - halfGap * ny));
-      this.addPoint(new go.Point(cx + halfGap * nx, cy + halfGap * ny));
-    } else {
-      this.addPoint(pA); this.addPoint(pB);
-    }
-    return true;
+  const from = oldData.from, to = oldData.to;
+  // 按照 优先级(自定义参数 > 全局配置) 获取参数
+  const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
+  const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
+  const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
+  const gap = customOpts.gap ?? CONFIG.gap;
+
+  m.removeLinkData(oldData); // 1. 移除原本的中线数据
+
+  // 2. 添加两条轨道数据，Key 自动变为 "L2_P0" 和 "L2_P1" 这种格式
+  const k0 = linkKey + "_P0", k1 = linkKey + "_P1";
+  m.addLinkData({ key: k0, from, to, kind: "parallel", index: 0, gap: gap });
+  m.addLinkData({ key: k1, from, to, kind: "parallel", index: 1, gap: gap });
+
+  // 3. 循环生成内部横杠数据
+  for (let j = 0; j < ladderCount; j++) {
+    const d = startOffset + j * ladderSpacing;
+    m.addLinkData({ from, to, kind: "ladder", d: d, gap: gap });          // 正向
+    m.addLinkData({ from, to, kind: "ladder", d: d, reverse: true, gap: gap }); // 反向
   }
 }
 
-/* ================= 5. Diagram & Templates ================= */
+/* ================= 5. Diagram 初始化与运行 ================= */
 const diagram = $(go.Diagram, "diagramDiv", { "undoManager.isEnabled": true });
+
+// 确保拖拽节点时，所有动态生成的梯线重新计算
 diagram.toolManager.draggingTool.doMouseMove = function() {
   go.DraggingTool.prototype.doMouseMove.call(this);
   diagram.links.each(l => { if (l instanceof LadderLink || l.data.kind) l.invalidateRoute(); });
 };
+
+// Node 模板
 diagram.nodeTemplate = $(go.Node, "Auto", { locationSpot: go.Spot.Center },
   new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
   $(go.Shape, "RoundedRectangle", { fill: "#fff", stroke: "#333", strokeWidth: 2 }),
   $(go.TextBlock, { margin: 10 }, new go.Binding("text", "key"))
 );
+
+// Link 模板绑定：SmartLink 处理轨道，LadderLink 处理红色装饰线
 diagram.linkTemplate = $(SmartLink, { selectable: false }, $(go.Shape, { stroke: "#333", strokeWidth: 2 }));
 diagram.linkTemplateMap.add("ladder", $(LadderLink, $(go.Shape, { stroke: "red", strokeWidth: 3 })));
 
-/* ================= 6. 参数合并逻辑修复 ================= */
-function addParallelWithLadders(from, to, customOpts = {}) {
-  const m = diagram.model;
-  // 核心修复：优先取 customOpts，如果没有则取 CONFIG.internalLadder
-  const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
-  const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
-  const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
-  const gap = customOpts.gap ?? CONFIG.gap; 
-
-  m.addLinkData({ key: from+"_"+to+"_P0", from, to, kind: "parallel", index: 0, gap: gap });
-  m.addLinkData({ key: from+"_"+to+"_P1", from, to, kind: "parallel", index: 1, gap: gap });
-  
-  for (let j = 0; j < ladderCount; j++) {
-    const d = startOffset + j * ladderSpacing;
-    m.addLinkData({ from, to, kind: "ladder", d: d, gap: gap });
-    m.addLinkData({ from, to, kind: "ladder", d: d, reverse: true, gap: gap });
-  }
-}
-
-/* ================= 7. Data ================= */
+/* ================= 6. 数据源 ================= */
 diagram.model = new go.GraphLinksModel(
   [{ key: "A", loc: "300 80" }, { key: "B", loc: "120 300" }, { key: "C", loc: "300 300" }, { key: "D", loc: "480 300" }],
   [
-    { key: "L1", from: "A", to: "B" }, { key: "L3", from: "A", to: "D" }, { key: "L4", from: "B", to: "C" },
-    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "A_C_P0" },
-    { category: "ladder", leftLinkKey: "L4", rightLinkKey: "A_C_P0" },
-    { category: "ladder", leftLinkKey: "A_C_P0", rightLinkKey: "L3" }
+    { key: "L1", from: "A", to: "B" }, 
+    { key: "L2", from: "A", to: "C" }, // 这里定义普通连线 L2
+    { key: "L3", from: "A", to: "D" }, // 这里定义普通连线 L3
+    { key: "L4", from: "B", to: "C" },
+    
+    // 红线只需声明连接 L1 与 L2_P0，由于封装了 SmartPoint，它会自动连接最近的边缘
+    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L2_P0" },
+    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L4" },
+    { category: "ladder", leftLinkKey: "L4", rightLinkKey: "L2_P0" },
+    { category: "ladder", leftLinkKey: "L2_P0", rightLinkKey: "L3_P0" } 
   ]
 );
 diagram.model.linkKeyProperty = "key";
 
+// 初始加载完成后，统一转换特定连线为平行线
 diagram.addDiagramListener("InitialLayoutCompleted", () => {
-  // 注意：如果这里传了 {} 以外的参数，会覆盖 CONFIG。
-  // 如果想测试 CONFIG 是否生效，直接调用 addParallelWithLadders("A", "C") 即可。
-  addParallelWithLadders("A", "C"); 
+  convertLinkToParallel("L2"); // 将 L2 转换，默认读取 CONFIG
+  convertLinkToParallel("L3", { ladderCount: 2, gap: 30 }); // 将 L3 转换，独立设置 2 个梯级和 30 间距
+  
   diagram.links.each(l => l.invalidateRoute());
 });
 </script>
