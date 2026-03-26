@@ -28,6 +28,13 @@ const CONFIG = {
   }
 };
 
+/** 逻辑 key（如 L2）在平行线转换后对应 L2_P0；未转换则仍为原 key */
+function resolveParallelLinkKey(diagram, logicalKey) {
+  const m = diagram.model;
+  if (!logicalKey || !m.findLinkDataForKey(logicalKey + "_P0")) return logicalKey;
+  return logicalKey + "_P0";
+}
+
 /* ================= 2. 核心类：SmartLink (处理轨道及内部梯级) ================= */
 class SmartLink extends go.Link {
   constructor() { super(); }
@@ -83,8 +90,9 @@ class LadderLink extends go.Link {
   // 自定义绘制多根梯线
   makeGeometry() {
     const geo = new go.Geometry();
-    const left = this.diagram.findLinkForKey(this.data.leftLinkKey);
-    const right = this.diagram.findLinkForKey(this.data.rightLinkKey);
+    const lk = (k) => resolveParallelLinkKey(this.diagram, k);
+    const left = this.diagram.findLinkForKey(lk(this.data.leftLinkKey));
+    const right = this.diagram.findLinkForKey(lk(this.data.rightLinkKey));
     if (!left || !right) return geo;
 
     // 寻找这两条线的公共交点
@@ -130,6 +138,20 @@ class LadderLink extends go.Link {
 }
 
 /* ================= 4. 封装函数：一键转换平行线 ================= */
+function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}) {
+  const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
+  const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
+  const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
+  const gap = customOpts.gap ?? CONFIG.gap;
+  m.addLinkData({ key: linkKey + "_P0", from, to, kind: "parallel", index: 0, gap: gap });
+  m.addLinkData({ key: linkKey + "_P1", from, to, kind: "parallel", index: 1, gap: gap });
+  for (let j = 0; j < ladderCount; j++) {
+    const d = startOffset + j * ladderSpacing;
+    m.addLinkData({ from, to, kind: "ladder", d: d, gap: gap });
+    m.addLinkData({ from, to, kind: "ladder", d: d, reverse: true, gap: gap });
+  }
+}
+
 /**
  * convertLinkToParallel: 将 Model 中的普通 Link 自动转换为双平行轨道结构
  * 会自动处理：1.删除原中线 2.生成两侧物理轨道 3.生成内部梯级
@@ -138,27 +160,21 @@ function convertLinkToParallel(linkKey, customOpts = {}) {
   const m = diagram.model;
   const oldData = m.findLinkDataForKey(linkKey);
   if (!oldData) return;
-
   const from = oldData.from, to = oldData.to;
-  // 按照 优先级(自定义参数 > 全局配置) 获取参数
-  const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
-  const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
-  const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
-  const gap = customOpts.gap ?? CONFIG.gap;
+  m.removeLinkData(oldData);
+  addParallelRailsForEdge(m, linkKey, from, to, customOpts);
+}
 
-  m.removeLinkData(oldData); // 1. 移除原本的中线数据
-
-  // 2. 添加两条轨道数据，Key 自动变为 "L2_P0" 和 "L2_P1" 这种格式
-  const k0 = linkKey + "_P0", k1 = linkKey + "_P1";
-  m.addLinkData({ key: k0, from, to, kind: "parallel", index: 0, gap: gap });
-  m.addLinkData({ key: k1, from, to, kind: "parallel", index: 1, gap: gap });
-
-  // 3. 循环生成内部横杠数据
-  for (let j = 0; j < ladderCount; j++) {
-    const d = startOffset + j * ladderSpacing;
-    m.addLinkData({ from, to, kind: "ladder", d: d, gap: gap });          // 正向
-    m.addLinkData({ from, to, kind: "ladder", d: d, reverse: true, gap: gap }); // 反向
-  }
+/** 双向 chain：移除正反两条中线，只保留一对平行轨（canonical key 为 forwardKey，如 L1_P0 / L1_P1） */
+function convertChainToParallel(forwardKey, reverseKey, customOpts = {}) {
+  const m = diagram.model;
+  const dF = m.findLinkDataForKey(forwardKey);
+  const dR = m.findLinkDataForKey(reverseKey);
+  if (!dF || !dR || dF.from !== dR.to || dF.to !== dR.from) return;
+  const from = dF.from, to = dF.to;
+  m.removeLinkData(dF);
+  m.removeLinkData(dR);
+  addParallelRailsForEdge(m, forwardKey, from, to, customOpts);
 }
 
 /* ================= 5. Diagram 初始化与运行 ================= */
@@ -185,27 +201,25 @@ diagram.linkTemplateMap.add("ladder", $(LadderLink, $(go.Shape, { stroke: "red",
 diagram.model = new go.GraphLinksModel(
   [{ key: "A", loc: "300 80" }, { key: "B", loc: "120 300" }, { key: "C", loc: "300 300" }, { key: "D", loc: "480 300" }],
   [
-    { key: "L1", from: "A", to: "B" }, 
-    { key: "L2", from: "A", to: "C" }, // 这里定义普通连线 L2
-    { key: "L3", from: "A", to: "D" }, // 这里定义普通连线 L3
+    { key: "L1", from: "A", to: "B", category: "chain" },
+    { key: "L5", from: "B", to: "A", category: "chain" },
+    { key: "L2", from: "A", to: "C" },
+    { key: "L3", from: "A", to: "D" },
     { key: "L4", from: "B", to: "C" },
-    
-    // 红线只需声明连接 L1 与 L2_P0，由于封装了 SmartPoint，它会自动连接最近的边缘
-    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L2_P0" },
-    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L4" },
-    { category: "ladder", leftLinkKey: "L4", rightLinkKey: "L2_P0" },
-    { category: "ladder", leftLinkKey: "L2_P0", rightLinkKey: "L3_P0" } 
+    { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L2" },
+    { category: "ladder", leftLinkKey: "L2", rightLinkKey: "L3" }
   ]
 );
 diagram.model.linkKeyProperty = "key";
 
 // 初始加载完成后，统一转换特定连线为平行线
 diagram.addDiagramListener("InitialLayoutCompleted", () => {
-  convertLinkToParallel("L2"); // 将 L2 转换，默认读取 CONFIG
-  convertLinkToParallel("L3", { ladderCount: 2, gap: 30 }); // 将 L3 转换，独立设置 2 个梯级和 30 间距
-  
+  convertChainToParallel("L1", "L5");
+  convertLinkToParallel("L2");
+  convertLinkToParallel("L3", { ladderCount: 2, gap: 30 });
   diagram.links.each(l => l.invalidateRoute());
 });
 </script>
 </body>
 </html>
+
