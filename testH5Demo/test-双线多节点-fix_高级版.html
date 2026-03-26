@@ -28,11 +28,39 @@ const CONFIG = {
   }
 };
 
-/** 逻辑 key（如 L2）在平行线转换后对应 L2_P0；未转换则仍为原 key */
+function ensureParallelKeyAliasMap(diagram) {
+  if (!diagram._parallelKeyAlias) diagram._parallelKeyAlias = new Map();
+  return diagram._parallelKeyAlias;
+}
+
+/** chain 合并后第二条边（如 L5）不再存在，解析到主 key（如 L1）再取 L1_P0 */
+function registerChainKeyAliases(diagram, canonicalKey, otherKey) {
+  const map = ensureParallelKeyAliasMap(diagram);
+  map.set(canonicalKey, canonicalKey);
+  if (otherKey && otherKey !== canonicalKey) map.set(otherKey, canonicalKey);
+}
+
+/**
+ * 两条 chain 是否描述同一对节点：支持 A>B+B>A，也支持 两条 A>B（后端两条同向边）。
+ * 合并后几何按 canonicalKey 那条的 from→to 作为平行轨方向。
+ */
+function sameChainEndpoints(d1, d2) {
+  if (!d1 || !d2) return false;
+  const a1 = d1.from, b1 = d1.to;
+  const a2 = d2.from, b2 = d2.to;
+  return (a1 === a2 && b1 === b2) || (a1 === b2 && b1 === a2);
+}
+
+/** 逻辑 key → 实际平行轨 link（*_P0）；chain 别名优先，否则有 *_P0 则用逻辑 key 本身 */
 function resolveParallelLinkKey(diagram, logicalKey) {
+  if (!logicalKey) return logicalKey;
   const m = diagram.model;
-  if (!logicalKey || !m.findLinkDataForKey(logicalKey + "_P0")) return logicalKey;
-  return logicalKey + "_P0";
+  const map = diagram._parallelKeyAlias;
+  const canonical = map && map.has(logicalKey) ? map.get(logicalKey) : logicalKey;
+  if (m.findLinkDataForKey(canonical + "_P0")) return canonical + "_P0";
+  if (canonical !== logicalKey && m.findLinkDataForKey(logicalKey + "_P0"))
+    return logicalKey + "_P0";
+  return logicalKey;
 }
 
 /* ================= 2. 核心类：SmartLink (处理轨道及内部梯级) ================= */
@@ -165,16 +193,20 @@ function convertLinkToParallel(linkKey, customOpts = {}) {
   addParallelRailsForEdge(m, linkKey, from, to, customOpts);
 }
 
-/** 双向 chain：移除正反两条中线，只保留一对平行轨（canonical key 为 forwardKey，如 L1_P0 / L1_P1） */
-function convertChainToParallel(forwardKey, reverseKey, customOpts = {}) {
+/**
+ * chain：移除两条中线（一正一反或两条同向），只保留一对平行轨。
+ * 轨 key 为 canonicalKey（如 L1_P0/L1_P1）；otherKey（如 L5）注册别名以便红线仍可写 leftLinkKey: "L5"。
+ */
+function convertChainToParallel(canonicalKey, otherKey, customOpts = {}) {
   const m = diagram.model;
-  const dF = m.findLinkDataForKey(forwardKey);
-  const dR = m.findLinkDataForKey(reverseKey);
-  if (!dF || !dR || dF.from !== dR.to || dF.to !== dR.from) return;
+  const dF = m.findLinkDataForKey(canonicalKey);
+  const dR = m.findLinkDataForKey(otherKey);
+  if (!dF || !dR || !sameChainEndpoints(dF, dR)) return;
   const from = dF.from, to = dF.to;
   m.removeLinkData(dF);
   m.removeLinkData(dR);
-  addParallelRailsForEdge(m, forwardKey, from, to, customOpts);
+  registerChainKeyAliases(diagram, canonicalKey, otherKey);
+  addParallelRailsForEdge(m, canonicalKey, from, to, customOpts);
 }
 
 /* ================= 5. Diagram 初始化与运行 ================= */
@@ -214,6 +246,7 @@ diagram.model.linkKeyProperty = "key";
 
 // 初始加载完成后，统一转换特定连线为平行线
 diagram.addDiagramListener("InitialLayoutCompleted", () => {
+  diagram._parallelKeyAlias = new Map();
   convertChainToParallel("L1", "L5");
   convertLinkToParallel("L2");
   convertLinkToParallel("L3", { ladderCount: 2, gap: 30 });
