@@ -77,6 +77,32 @@ function resolveParallelRailSides(opts) {
   return [base0, base1];
 }
 
+/**
+ * chain 单边对应一条物理轨：只解析「这一条」link 的样式（与 parallel 单边写 railStroke0/1 两轨不同）。
+ * 优先 railTrack；否则 railStroke + railStrokeWidth；否则退回该边 railOpts 里「第一侧」合并结果（railStroke0 / railStrokes[0] 等）。
+ */
+function resolveChainLinkTrackStyle(d) {
+  const pr = CONFIG.parallelRail;
+  const fallbackStroke = (pr.side0 && pr.side0.stroke) || "#333";
+  const fallbackW = (pr.side0 && pr.side0.strokeWidth != null) ? pr.side0.strokeWidth : 2;
+  if (!d) return { stroke: fallbackStroke, strokeWidth: fallbackW };
+  if (d.railTrack && typeof d.railTrack === "object") {
+    const t = d.railTrack;
+    return {
+      stroke: t.stroke != null && t.stroke !== "" ? t.stroke : fallbackStroke,
+      strokeWidth: t.strokeWidth != null ? t.strokeWidth : fallbackW
+    };
+  }
+  if (d.railStroke != null && d.railStroke !== "") {
+    return {
+      stroke: d.railStroke,
+      strokeWidth: d.railStrokeWidth != null ? d.railStrokeWidth : fallbackW
+    };
+  }
+  const [one] = resolveParallelRailSides(railOptsFromLinkData(d));
+  return { stroke: one.stroke, strokeWidth: one.strokeWidth };
+}
+
 /** 逻辑 key → 实际平行轨 link（*_P0）；chain 别名优先，否则有 *_P0 则用逻辑 key 本身 */
 function resolveParallelLinkKey(diagram, logicalKey) {
   if (!logicalKey) return logicalKey;
@@ -333,7 +359,13 @@ function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}, diag = n
   const gap = customOpts.gap ?? CONFIG.gap;
   const railCategory = customOpts.railCategory ?? "parallel";
   const rungCategory = customOpts.rungCategory ?? "rung";
-  const [side0, side1] = resolveParallelRailSides(customOpts);
+  let side0, side1;
+  if (Array.isArray(customOpts._chainPerLinkTracks) && customOpts._chainPerLinkTracks.length === 2) {
+    side0 = customOpts._chainPerLinkTracks[0];
+    side1 = customOpts._chainPerLinkTracks[1];
+  } else {
+    [side0, side1] = resolveParallelRailSides(customOpts);
+  }
   if (mode === "fullSpan") {
     m.addLinkData({
       key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory,
@@ -424,6 +456,9 @@ function railOptsFromLinkData(d) {
 /**
  * 按模型声明应用几何：category "chain" 且同端点对的两条边自动合并为平行链条；
  * category "parallel" 的单边自动扩为双轨（可选 ladderCount、gap 等写在对应 linkData 上）。
+ *
+ * chain：两条边按 key 字典序排序后，第一条（如 L1）只决定 P0 轨颜色，第二条（如 L5）只决定 P1 轨颜色。
+ * 每条边单独写 railTrack / railStroke（见 resolveChainLinkTrackStyle）；parallel 单边仍可用 railStroke0/1、railStrokes。
  */
 function applyDeclaredLinkGeometry(diag) {
   const m = diag.model;
@@ -442,6 +477,10 @@ function applyDeclaredLinkGeometry(diag) {
     if (group.length < 2) continue;
     group.sort((a, b) => String(a.key).localeCompare(String(b.key)));
     const opts = { ...railOptsFromLinkData(group[0]), ...railOptsFromLinkData(group[1]) };
+    opts._chainPerLinkTracks = [
+      resolveChainLinkTrackStyle(group[0]),
+      resolveChainLinkTrackStyle(group[1])
+    ];
     convertChainToParallel(group[0].key, group[1].key, opts, diag);
   }
 
@@ -604,8 +643,8 @@ diagram.linkTemplate = normalLinkTpl;
 diagram.model = new go.GraphLinksModel(
   [{ key: "A", loc: "300 80" }, { key: "B", loc: "120 300" }, { key: "C", loc: "300 300" }, { key: "D", loc: "480 300" }],
   [
-    { key: "L1", from: "A", to: "B", category: "chain" },
-    { key: "L5", from: "B", to: "A", category: "chain" },
+    { key: "L1", from: "A", to: "B", category: "chain", railTrack: { stroke: "#0d47a1", strokeWidth: 2 } },
+    { key: "L5", from: "B", to: "A", category: "chain", railTrack: { stroke: "#e65100", strokeWidth: 3 } },
     { key: "L2", from: "A", to: "C", category: "parallel", internalLadderMode: "fullSpan", startOffset: 12, ladderSpacing: 14, railStrokes: ["#1565c0", "#ef6c00"] },
     { key: "L3", from: "A", to: "D", category: "parallel", ladderCount: 2, gap: 30 },
     { key: "L4", from: "B", to: "C" },
