@@ -244,6 +244,59 @@ function convertChainToParallel(canonicalKey, otherKey, customOpts = {}) {
   addParallelRailsForEdge(m, canonicalKey, from, to, { ...customOpts, railCategory: "chain" });
 }
 
+/** 无向边签名，用于把两条 category:chain 归到同一对端点上 */
+function undirectedEdgeSig(from, to) {
+  const a = String(from), b = String(to);
+  return a <= b ? a + "\0" + b : b + "\0" + a;
+}
+
+/** 从 linkData 上读取扩轨 / 梯级参数（ladderCount、gap 等） */
+function railOptsFromLinkData(d) {
+  if (!d) return {};
+  const o = {};
+  if (d.ladderCount != null) o.ladderCount = d.ladderCount;
+  if (d.gap != null) o.gap = d.gap;
+  if (d.startOffset != null) o.startOffset = d.startOffset;
+  if (d.ladderSpacing != null) o.ladderSpacing = d.ladderSpacing;
+  if (d.rungCategory != null) o.rungCategory = d.rungCategory;
+  return o;
+}
+
+/**
+ * 按模型声明应用几何：category "chain" 且同端点对的两条边自动合并为平行链条；
+ * category "parallel" 的单边自动扩为双轨（可选 ladderCount、gap 等写在对应 linkData 上）。
+ */
+function applyDeclaredLinkGeometry(diag) {
+  const m = diag.model;
+  diag._parallelKeyAlias = new Map();
+
+  const chainLinks = m.linkDataArray.filter(d =>
+    d && d.category === "chain" && d.key != null && d.from != null && d.to != null
+  );
+  const byEdge = new Map();
+  for (const d of chainLinks) {
+    const sig = undirectedEdgeSig(d.from, d.to);
+    if (!byEdge.has(sig)) byEdge.set(sig, []);
+    byEdge.get(sig).push(d);
+  }
+  for (const group of byEdge.values()) {
+    if (group.length < 2) continue;
+    group.sort((a, b) => String(a.key).localeCompare(String(b.key)));
+    const opts = { ...railOptsFromLinkData(group[0]), ...railOptsFromLinkData(group[1]) };
+    convertChainToParallel(group[0].key, group[1].key, opts);
+  }
+
+  const parallelLinks = m.linkDataArray.filter(d =>
+    d && d.category === "parallel" && d.key != null && d.from != null && d.to != null &&
+    !String(d.key).endsWith("_P0") && !String(d.key).endsWith("_P1")
+  );
+  for (const d of parallelLinks) {
+    convertLinkToParallel(d.key, railOptsFromLinkData(d));
+  }
+
+  diag.links.each(l => l.invalidateRoute());
+}
+
 /**
  * linkTemplateMap.category 约定（与 model 中 linkData.category 一致）：
  *   ""        → NormalLink
@@ -290,8 +343,8 @@ diagram.model = new go.GraphLinksModel(
   [
     { key: "L1", from: "A", to: "B", category: "chain" },
     { key: "L5", from: "B", to: "A", category: "chain" },
-    { key: "L2", from: "A", to: "C" },
-    { key: "L3", from: "A", to: "D" },
+    { key: "L2", from: "A", to: "C", category: "parallel" },
+    { key: "L3", from: "A", to: "D", category: "parallel", ladderCount: 2, gap: 30 },
     { key: "L4", from: "B", to: "C" },
     { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L2" },
     { category: "ladder", leftLinkKey: "L2", rightLinkKey: "L3" }
@@ -299,13 +352,9 @@ diagram.model = new go.GraphLinksModel(
 );
 diagram.model.linkKeyProperty = "key";
 
-// 初始加载完成后，统一转换特定连线为平行线
+// 初始布局后：仅根据 linkData.category / 端点对 做 chain 合并与 parallel 扩轨（见 applyDeclaredLinkGeometry）
 diagram.addDiagramListener("InitialLayoutCompleted", () => {
-  diagram._parallelKeyAlias = new Map();
-  convertChainToParallel("L1", "L5");
-  convertLinkToParallel("L2");
-  convertLinkToParallel("L3", { ladderCount: 2, gap: 30 });
-  diagram.links.each(l => l.invalidateRoute());
+  applyDeclaredLinkGeometry(diagram);
 });
 </script>
 </body>
