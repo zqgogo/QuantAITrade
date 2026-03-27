@@ -16,15 +16,22 @@ const $ = go.GraphObject.make;
 /* ================= 1. 统一参数配置中心 ================= */
 const CONFIG = {
   gap: 20,              // 两根平行线之间的间距
+  /** 平行双轨描边：可全局默认；单条边可用 railStroke0 / railStroke1 或 railStrokes: [c0,c1] 覆盖 */
+  parallelRail: {
+    stroke0: "#333",
+    stroke1: "#333"
+  },
   edgeLadder: {         // 红色跨边梯线（红线）的默认参数
     startOffset: 50,    // 距离共享节点的起始距离
     ladderSpacing: 20,  // 红线组内部的线条间距
     ladderCount: 2      // 绘制多少根红杠
   },
   internalLadder: {     // 平行线内部梯级（黑色短杠）的默认参数
-    startOffset: 15,    // 距离端点的偏移量
-    ladderSpacing: 12,  // 线条之间的间距
-    ladderCount: 4      // 每一端绘制多少根黑杠
+    /** fromEnds：从两端相向画，需 ladderCount；fullSpan：中间按间距铺满，不需要 ladderCount */
+    mode: "fullSpan",   // "fromEnds" | "fullSpan"
+    startOffset: 15,    // 距两端留白（fullSpan：首尾各留 startOffset）
+    ladderSpacing: 12,  // 横杠间距（fromEnds：每侧相邻横杠距；fullSpan：相邻横杠沿轨距）
+    ladderCount: 4      // 仅 fromEnds：每一端绘制多少根黑杠
   }
 };
 
@@ -49,6 +56,17 @@ function sameChainEndpoints(d1, d2) {
   const a1 = d1.from, b1 = d1.to;
   const a2 = d2.from, b2 = d2.to;
   return (a1 === a2 && b1 === b2) || (a1 === b2 && b1 === a2);
+}
+
+/** 从 customOpts / CONFIG 解析两侧轨颜色，写入各 *_P0 / *_P1 的 railStroke */
+function resolveRailStrokes(opts) {
+  let s0 = opts.railStroke0 ?? CONFIG.parallelRail.stroke0;
+  let s1 = opts.railStroke1 ?? CONFIG.parallelRail.stroke1;
+  if (Array.isArray(opts.railStrokes)) {
+    if (opts.railStrokes[0] != null && opts.railStrokes[0] !== "") s0 = opts.railStrokes[0];
+    if (opts.railStrokes[1] != null && opts.railStrokes[1] !== "") s1 = opts.railStrokes[1];
+  }
+  return [s0, s1];
 }
 
 /** 逻辑 key → 实际平行轨 link（*_P0）；chain 别名优先，否则有 *_P0 则用逻辑 key 本身 */
@@ -112,16 +130,32 @@ class ParallelChainLink extends go.Link {
 
 /**
  * ChainRungLink：仅绘制平行轨之间的黑色短横杠（category 固定为 "rung"）。
- * 数据字段：d，reverse?，gap。
+ * 数据字段：
+ *   fromEnds：d，reverse?，gap
+ *   fullSpan：internalLadderMode:"fullSpan"，startOffset，ladderSpacing，gap（无 d / reverse）
  */
 class ChainRungLink extends go.Link {
   constructor() { super(); }
+
+  _rungMode() {
+    if (this.data.internalLadderMode === "fullSpan") return "fullSpan";
+    if (this.data.internalLadderMode === "fromEnds") return "fromEnds";
+    // 批量生成的短线每条带 d；与全局 mode 解耦，避免 CONFIG 设为 fullSpan 时误判
+    if (this.data.d != null) return "fromEnds";
+    return CONFIG.internalLadder.mode ?? "fromEnds";
+  }
 
   computePoints() {
     const A = this.fromNode, B = this.toNode;
     if (!A || !B) return false;
     const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
     const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
+    this.clearPoints();
+    if (this._rungMode() === "fullSpan") {
+      this.addPoint(pA);
+      this.addPoint(pB);
+      return true;
+    }
     const dx = pB.x - pA.x, dy = pB.y - pA.y;
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len, ny = dx / len;
@@ -129,11 +163,42 @@ class ChainRungLink extends go.Link {
     const d = this.data.d ?? 20;
     const t = (this.data.reverse ? (len - d) : d) / len;
     const cx = pA.x + dx * t, cy = pA.y + dy * t;
-
-    this.clearPoints();
     this.addPoint(new go.Point(cx - halfGap * nx, cy - halfGap * ny));
     this.addPoint(new go.Point(cx + halfGap * nx, cy + halfGap * ny));
     return true;
+  }
+
+  makeGeometry() {
+    if (this._rungMode() !== "fullSpan") return super.makeGeometry();
+    const geo = new go.Geometry();
+    const A = this.fromNode, B = this.toNode;
+    if (!A || !B) return geo;
+    const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
+    const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
+    const dx = pB.x - pA.x, dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
+    const startOffset = this.data.startOffset ?? CONFIG.internalLadder.startOffset;
+    const spacing = Math.max(this.data.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing, 1e-6);
+    const maxD = len - startOffset;
+    const edgeEps = 1e-3;
+    if (maxD < startOffset - edgeEps) return geo;
+    const nx = -dy / len, ny = dx / len;
+    // Geometry 必须是 Link 局部坐标；在文档里按弦向距离 d、法向 ±halfGap 定位后转入局部位（与 fromEnds 的 super.makeGeometry 一致）
+    const toLoc = (x, y) => this.getLocalPoint(new go.Point(x, y));
+    for (let k = 0; ; k++) {
+      const d = startOffset + k * spacing;
+      if (d > maxD + edgeEps) break;
+      const t = d / len;
+      const cx = pA.x + dx * t, cy = pA.y + dy * t;
+      const x1 = cx - halfGap * nx, y1 = cy - halfGap * ny;
+      const x2 = cx + halfGap * nx, y2 = cy + halfGap * ny;
+      const a = toLoc(x1, y1), b = toLoc(x2, y2);
+      const fig = new go.PathFigure(a.x, a.y, false);
+      fig.add(new go.PathSegment(go.PathSegment.Line, b.x, b.y));
+      geo.add(fig);
+    }
+    return geo;
   }
 }
 
@@ -200,18 +265,28 @@ class LadderLink extends go.Link {
 
 /* ================= 4. 封装：按 category 写入「平行轨」与「轨内横杠」两类 linkData ================= */
 function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}) {
+  const mode = customOpts.internalLadderMode ?? CONFIG.internalLadder.mode ?? "fromEnds";
   const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
   const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
   const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
   const gap = customOpts.gap ?? CONFIG.gap;
   const railCategory = customOpts.railCategory ?? "parallel";
   const rungCategory = customOpts.rungCategory ?? "rung";
-  m.addLinkData({ key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory });
-  m.addLinkData({ key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory });
-  for (let j = 0; j < ladderCount; j++) {
-    const d = startOffset + j * ladderSpacing;
-    m.addLinkData({ from, to, d, gap, category: rungCategory });
-    m.addLinkData({ from, to, d, reverse: true, gap, category: rungCategory });
+  const [rs0, rs1] = resolveRailStrokes(customOpts);
+  m.addLinkData({ key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory, railStroke: rs0 });
+  m.addLinkData({ key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory, railStroke: rs1 });
+  if (mode === "fullSpan") {
+    m.addLinkData({
+      from, to, gap, category: rungCategory,
+      internalLadderMode: "fullSpan",
+      startOffset, ladderSpacing
+    });
+  } else {
+    for (let j = 0; j < ladderCount; j++) {
+      const d = startOffset + j * ladderSpacing;
+      m.addLinkData({ from, to, d, gap, category: rungCategory });
+      m.addLinkData({ from, to, d, reverse: true, gap, category: rungCategory });
+    }
   }
 }
 
@@ -250,7 +325,7 @@ function undirectedEdgeSig(from, to) {
   return a <= b ? a + "\0" + b : b + "\0" + a;
 }
 
-/** 从 linkData 上读取扩轨 / 梯级参数（ladderCount、gap 等） */
+/** 从 linkData 上读取扩轨 / 梯级参数（ladderCount、gap、internalLadderMode 等） */
 function railOptsFromLinkData(d) {
   if (!d) return {};
   const o = {};
@@ -258,7 +333,11 @@ function railOptsFromLinkData(d) {
   if (d.gap != null) o.gap = d.gap;
   if (d.startOffset != null) o.startOffset = d.startOffset;
   if (d.ladderSpacing != null) o.ladderSpacing = d.ladderSpacing;
+  if (d.internalLadderMode != null) o.internalLadderMode = d.internalLadderMode;
   if (d.rungCategory != null) o.rungCategory = d.rungCategory;
+  if (d.railStroke0 != null) o.railStroke0 = d.railStroke0;
+  if (d.railStroke1 != null) o.railStroke1 = d.railStroke1;
+  if (Array.isArray(d.railStrokes)) o.railStrokes = d.railStrokes;
   return o;
 }
 
@@ -309,13 +388,43 @@ function applyDeclaredLinkGeometry(diag) {
 const diagram = $(go.Diagram, "diagramDiv", { "undoManager.isEnabled": true });
 diagram.linkCategoryProperty = "category";
 
-// 确保拖拽节点时，所有动态生成的梯线重新计算
-diagram.toolManager.draggingTool.doMouseMove = function() {
-  go.DraggingTool.prototype.doMouseMove.call(this);
-  diagram.links.each(l => {
-    if (l instanceof LadderLink || l instanceof ParallelChainLink || l instanceof ChainRungLink) l.invalidateRoute();
-  });
-};
+// 拖拽时刷新平行轨 / 横杠 / 红线；rAF 合并一帧内多次 mouseMove；抬起 / 取消时强制再刷一帧
+(function installDragInvalidateRaf() {
+  const drag = diagram.toolManager.draggingTool;
+  let rafId = null;
+  function invalidateDynamicLinks() {
+    diagram.links.each(l => {
+      if (l instanceof LadderLink || l instanceof ParallelChainLink || l instanceof ChainRungLink) l.invalidateRoute();
+    });
+  }
+  function flushInvalidate() {
+    if (rafId != null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    invalidateDynamicLinks();
+  }
+  const baseMove = drag.doMouseMove.bind(drag);
+  drag.doMouseMove = function() {
+    baseMove();
+    if (rafId == null) {
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        invalidateDynamicLinks();
+      });
+    }
+  };
+  const baseUp = drag.doMouseUp.bind(drag);
+  drag.doMouseUp = function() {
+    baseUp();
+    flushInvalidate();
+  };
+  const baseCancel = drag.doCancel.bind(drag);
+  drag.doCancel = function() {
+    baseCancel();
+    flushInvalidate();
+  };
+})();
 
 // Node 模板
 diagram.nodeTemplate = $(go.Node, "Auto", { locationSpot: go.Spot.Center },
@@ -327,7 +436,14 @@ diagram.nodeTemplate = $(go.Node, "Auto", { locationSpot: go.Spot.Center },
 const linkBinding = { selectable: false };
 const edgeShape = { stroke: "#333", strokeWidth: 2 };
 const normalLinkTpl = $(NormalLink, linkBinding, $(go.Shape, edgeShape));
-const parallelChainLinkTpl = $(ParallelChainLink, linkBinding, $(go.Shape, edgeShape));
+const parallelChainLinkTpl = $(ParallelChainLink, linkBinding,
+  $(go.Shape, edgeShape,
+    new go.Binding("stroke", "railStroke", (v, sh) => {
+      if (v != null && v !== "") return v;
+      const d = sh.part && sh.part.data;
+      if (d && d.index === 1) return CONFIG.parallelRail.stroke1;
+      return CONFIG.parallelRail.stroke0;
+    })));
 const chainRungLinkTpl = $(ChainRungLink, linkBinding, $(go.Shape, edgeShape));
 
 diagram.linkTemplateMap.add("", normalLinkTpl);
@@ -343,7 +459,7 @@ diagram.model = new go.GraphLinksModel(
   [
     { key: "L1", from: "A", to: "B", category: "chain" },
     { key: "L5", from: "B", to: "A", category: "chain" },
-    { key: "L2", from: "A", to: "C", category: "parallel" },
+    { key: "L2", from: "A", to: "C", category: "parallel", internalLadderMode: "fullSpan", startOffset: 12, ladderSpacing: 14, railStrokes: ["#1565c0", "#ef6c00"] },
     { key: "L3", from: "A", to: "D", category: "parallel", ladderCount: 2, gap: 30 },
     { key: "L4", from: "B", to: "C" },
     { category: "ladder", leftLinkKey: "L1", rightLinkKey: "L2" },
