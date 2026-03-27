@@ -16,10 +16,13 @@ const $ = go.GraphObject.make;
 /* ================= 1. 统一参数配置中心 ================= */
 const CONFIG = {
   gap: 20,              // 两根平行线之间的间距
-  /** 平行双轨描边：可全局默认；单条边可用 railStroke0 / railStroke1 或 railStrokes: [c0,c1] 覆盖 */
+  /**
+   * 平行双轨两侧默认样式（index 0 / 1 对应 P0 / P1）。
+   * 单条边可覆盖：railStroke0/1、railStrokes:[c0,c1]、railSide0/1（部分字段合并，如 { strokeWidth: 3 }）
+   */
   parallelRail: {
-    stroke0: "#333",
-    stroke1: "#333"
+    side0: { stroke: "#333", strokeWidth: 2 },
+    side1: { stroke: "#333", strokeWidth: 2 }
   },
   edgeLadder: {         // 红色跨边梯线（红线）的默认参数
     startOffset: 50,    // 距离共享节点的起始距离
@@ -27,7 +30,7 @@ const CONFIG = {
     ladderCount: 2      // 绘制多少根红杠
   },
   internalLadder: {     // 平行线内部梯级（黑色短杠）的默认参数
-    /** fromEnds：从两端相向画，需 ladderCount；fullSpan：拆成多条单侧 d 的 rung，按间距铺满，条数在布局/拖动结束后再算 */
+    /** fromEnds：从两端相向画，需 ladderCount；fullSpan：多条单侧 d 的 rung 铺满；拖动中随弦长动态增减条数 */
     mode: "fullSpan",   // "fromEnds" | "fullSpan"
     startOffset: 15,    // 距两端留白（fullSpan：首尾各留 startOffset）
     ladderSpacing: 12,  // 横杠间距（fromEnds：每侧相邻横杠距；fullSpan：相邻横杠沿轨距）
@@ -58,15 +61,20 @@ function sameChainEndpoints(d1, d2) {
   return (a1 === a2 && b1 === b2) || (a1 === b2 && b1 === a2);
 }
 
-/** 从 customOpts / CONFIG 解析两侧轨颜色，写入各 *_P0 / *_P1 的 railStroke */
-function resolveRailStrokes(opts) {
-  let s0 = opts.railStroke0 ?? CONFIG.parallelRail.stroke0;
-  let s1 = opts.railStroke1 ?? CONFIG.parallelRail.stroke1;
+/** 合并 CONFIG.parallelRail.side0/1 与单条边上的覆盖，得到两侧 { stroke, strokeWidth } */
+function resolveParallelRailSides(opts) {
+  const pr = CONFIG.parallelRail;
+  const base0 = { stroke: "#333", strokeWidth: 2, ...(pr.side0 || {}) };
+  const base1 = { stroke: "#333", strokeWidth: 2, ...(pr.side1 || {}) };
+  if (opts.railStroke0 != null && opts.railStroke0 !== "") base0.stroke = opts.railStroke0;
+  if (opts.railStroke1 != null && opts.railStroke1 !== "") base1.stroke = opts.railStroke1;
   if (Array.isArray(opts.railStrokes)) {
-    if (opts.railStrokes[0] != null && opts.railStrokes[0] !== "") s0 = opts.railStrokes[0];
-    if (opts.railStrokes[1] != null && opts.railStrokes[1] !== "") s1 = opts.railStrokes[1];
+    if (opts.railStrokes[0] != null && opts.railStrokes[0] !== "") base0.stroke = opts.railStrokes[0];
+    if (opts.railStrokes[1] != null && opts.railStrokes[1] !== "") base1.stroke = opts.railStrokes[1];
   }
-  return [s0, s1];
+  if (opts.railSide0 && typeof opts.railSide0 === "object") Object.assign(base0, opts.railSide0);
+  if (opts.railSide1 && typeof opts.railSide1 === "object") Object.assign(base1, opts.railSide1);
+  return [base0, base1];
 }
 
 /** 逻辑 key → 实际平行轨 link（*_P0）；chain 别名优先，否则有 *_P0 则用逻辑 key 本身 */
@@ -231,11 +239,17 @@ function chordLenFromNodeLocs(m, fromK, toK) {
   return 1;
 }
 
+/**
+ * 与 ChainRungLink / ParallelChainLink 一致：用两端 getLinkPoint 算弦长。
+ * 勿用轨道路径点或节点中心 loc——中心距会偏大，fullSpan 会多算横杠而「顶穿」对端 startOffset。
+ */
 function estimateChordLengthForParallelEdge(diag, linkKey, fromK, toK) {
   const rail = diag.findLinkForKey(linkKey + "_P0");
-  if (rail && rail.pointsCount >= 2) {
-    const p0 = rail.getPoint(0), pe = rail.getPoint(rail.pointsCount - 1);
-    return Math.hypot(pe.x - p0.x, pe.y - p0.y) || 1;
+  if (rail && rail.fromNode && rail.toNode) {
+    const A = rail.fromNode, B = rail.toNode;
+    const pA = rail.getLinkPoint(A, rail.fromPort, rail.computeSpot(true), true, false, B, rail.toPort);
+    const pB = rail.getLinkPoint(B, rail.toPort, rail.computeSpot(false), false, false, A, rail.fromPort);
+    return Math.hypot(pB.x - pA.x, pB.y - pA.y) || 1;
   }
   return chordLenFromNodeLocs(diag.model, fromK, toK);
 }
@@ -252,12 +266,13 @@ function rebuildFullSpanRungsInModel(diag, linkKey) {
   for (const x of toRemove) m.removeLinkData(x);
   const len = estimateChordLengthForParallelEdge(diag, linkKey, from, to);
   const maxD = len - startOffset;
-  const edgeEps = 1e-3;
-  if (maxD < startOffset - edgeEps) return;
+  const minRoom = 1e-3;
+  if (maxD < startOffset - minRoom) return;
+  const endMarginPx = 0.35;
   let k = 0;
   for (;;) {
     const d = startOffset + k * spacing;
-    if (d > maxD + edgeEps) break;
+    if (d > maxD - endMarginPx) break;
     m.addLinkData({
       key: linkKey + "_s" + k,
       from, to, d, gap, category: "rung",
@@ -280,6 +295,36 @@ function rebuildAllFullSpanRungs(diag) {
   }
 }
 
+/** 拖动中：仅重算「端点在被拖节点集合里」的 fullSpan 横杠条数（无拖动节点则跳过，避免误全量重建） */
+function rebuildFullSpanRungsTouchingDraggedNodes(diag, dragged) {
+  if (!dragged || dragged.size === 0) return;
+  const run = () => {
+    const seen = new Set();
+    for (const d of diag.model.linkDataArray) {
+      if (!d || d.key == null) continue;
+      const ks = String(d.key);
+      if (!ks.endsWith("_P0") || d.parallelEdgeMode !== "fullSpan") continue;
+      const fN = diag.findNodeForKey(d.from), tN = diag.findNodeForKey(d.to);
+      if (!fN || !tN) continue;
+      if (!dragged.has(fN) && !dragged.has(tN)) continue;
+      const base = ks.slice(0, -3);
+      if (seen.has(base)) continue;
+      seen.add(base);
+      rebuildFullSpanRungsInModel(diag, base);
+    }
+  };
+  if (diag.skipsUndoManager) {
+    run();
+    return;
+  }
+  diag.skipsUndoManager = true;
+  try {
+    run();
+  } finally {
+    diag.skipsUndoManager = false;
+  }
+}
+
 function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}, diag = null) {
   const mode = customOpts.internalLadderMode ?? CONFIG.internalLadder.mode ?? "fromEnds";
   const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
@@ -288,22 +333,30 @@ function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}, diag = n
   const gap = customOpts.gap ?? CONFIG.gap;
   const railCategory = customOpts.railCategory ?? "parallel";
   const rungCategory = customOpts.rungCategory ?? "rung";
-  const [rs0, rs1] = resolveRailStrokes(customOpts);
+  const [side0, side1] = resolveParallelRailSides(customOpts);
   if (mode === "fullSpan") {
     m.addLinkData({
-      key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory, railStroke: rs0,
+      key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory,
+      railStroke: side0.stroke, railStrokeWidth: side0.strokeWidth,
       parallelEdgeMode: "fullSpan",
       spanStartOffset: startOffset,
       spanSpacing: ladderSpacing
     });
     m.addLinkData({
-      key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory, railStroke: rs1,
+      key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory,
+      railStroke: side1.stroke, railStrokeWidth: side1.strokeWidth,
       parallelEdgeMode: "fullSpan"
     });
     if (diag) rebuildFullSpanRungsInModel(diag, linkKey);
   } else {
-    m.addLinkData({ key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory, railStroke: rs0 });
-    m.addLinkData({ key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory, railStroke: rs1 });
+    m.addLinkData({
+      key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory,
+      railStroke: side0.stroke, railStrokeWidth: side0.strokeWidth
+    });
+    m.addLinkData({
+      key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory,
+      railStroke: side1.stroke, railStrokeWidth: side1.strokeWidth
+    });
     for (let j = 0; j < ladderCount; j++) {
       const d = startOffset + j * ladderSpacing;
       m.addLinkData({ from, to, d, gap, category: rungCategory });
@@ -360,6 +413,8 @@ function railOptsFromLinkData(d) {
   if (d.railStroke0 != null) o.railStroke0 = d.railStroke0;
   if (d.railStroke1 != null) o.railStroke1 = d.railStroke1;
   if (Array.isArray(d.railStrokes)) o.railStrokes = d.railStrokes;
+  if (d.railSide0 && typeof d.railSide0 === "object") o.railSide0 = { ...d.railSide0 };
+  if (d.railSide1 && typeof d.railSide1 === "object") o.railSide1 = { ...d.railSide1 };
   if (d.parallelEdgeMode != null) o.parallelEdgeMode = d.parallelEdgeMode;
   if (d.spanStartOffset != null) o.spanStartOffset = d.spanStartOffset;
   if (d.spanSpacing != null) o.spanSpacing = d.spanSpacing;
@@ -416,13 +471,22 @@ function applyDeclaredLinkGeometry(diag) {
 const diagram = $(go.Diagram, "diagramDiv", { "undoManager.isEnabled": true });
 diagram.linkCategoryProperty = "category";
 
-/** 当前拖拽中的节点集合（只刷新与这些节点相连的动态线，避免拖 D 时 A–C 的 fullSpan 被无谓 invalidate 导致抖动） */
-function draggedNodeSetFromTool(tool) {
+/**
+ * 当前拖拽中的节点：优先 draggedParts；为空时用 selection（GoJS 部分版本拖动时 draggedParts 晚一拍为空，
+ * 会导致 fullSpan 在拖动中不重算）。
+ */
+function draggedNodeSetFromTool(tool, diag) {
   const s = new Set();
-  if (!tool || !tool.draggedParts) return s;
-  tool.draggedParts.each(p => {
-    if (p instanceof go.Node) s.add(p);
-  });
+  if (tool && tool.draggedParts) {
+    tool.draggedParts.each(p => {
+      if (p instanceof go.Node) s.add(p);
+    });
+  }
+  if (s.size === 0 && tool && tool.isActive && diag && diag.selection) {
+    diag.selection.each(p => {
+      if (p instanceof go.Node) s.add(p);
+    });
+  }
   return s;
 }
 
@@ -447,7 +511,7 @@ function ladderTouchesDraggedNodes(ladderLink, diag, dragged) {
 
 function invalidateDynamicLinksForDrag(diag, tool) {
   if (!tool || !tool.isActive) return;
-  const dragged = draggedNodeSetFromTool(tool);
+  const dragged = draggedNodeSetFromTool(tool, diag);
   if (dragged.size === 0) {
     invalidateAllDynamicLinks(diag);
     return;
@@ -481,6 +545,8 @@ function invalidateAllDynamicLinks(diag) {
   const baseMove = drag.doMouseMove.bind(drag);
   drag.doMouseMove = function() {
     baseMove();
+    const dragged = draggedNodeSetFromTool(drag, diagram);
+    rebuildFullSpanRungsTouchingDraggedNodes(diagram, dragged);
     if (rafId == null) {
       rafId = requestAnimationFrame(() => {
         rafId = null;
@@ -511,12 +577,19 @@ const linkBinding = { selectable: false };
 const edgeShape = { stroke: "#333", strokeWidth: 2 };
 const normalLinkTpl = $(NormalLink, linkBinding, $(go.Shape, edgeShape));
 const parallelChainLinkTpl = $(ParallelChainLink, linkBinding,
-  $(go.Shape, edgeShape,
+  $(go.Shape,
+    { stroke: CONFIG.parallelRail.side0.stroke, strokeWidth: CONFIG.parallelRail.side0.strokeWidth },
     new go.Binding("stroke", "railStroke", (v, sh) => {
       if (v != null && v !== "") return v;
       const d = sh.part && sh.part.data;
-      if (d && d.index === 1) return CONFIG.parallelRail.stroke1;
-      return CONFIG.parallelRail.stroke0;
+      const side = d && d.index === 1 ? CONFIG.parallelRail.side1 : CONFIG.parallelRail.side0;
+      return (side && side.stroke) || "#333";
+    }),
+    new go.Binding("strokeWidth", "railStrokeWidth", (v, sh) => {
+      if (v != null && v !== "") return v;
+      const d = sh.part && sh.part.data;
+      const side = d && d.index === 1 ? CONFIG.parallelRail.side1 : CONFIG.parallelRail.side0;
+      return (side && side.strokeWidth != null) ? side.strokeWidth : 2;
     })));
 const chainRungLinkTpl = $(ChainRungLink, linkBinding, $(go.Shape, edgeShape));
 
@@ -547,7 +620,7 @@ diagram.addDiagramListener("InitialLayoutCompleted", () => {
   applyDeclaredLinkGeometry(diagram);
 });
 
-// 拖动结束：按新弦长重算 fullSpan 横杠条数（拖动中每条 rung 仅用 d 跟轨，不增删 link，稳定）
+// 拖动结束再全量同步一次（程序改位置、非 DraggingTool 等情况）；平常拖动中已在 rAF 里动态重算条数
 diagram.addDiagramListener("SelectionMoved", () => {
   if (diagram.skipsUndoManager) return;
   diagram.skipsUndoManager = true;
