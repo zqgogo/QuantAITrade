@@ -63,7 +63,7 @@ function resolveParallelLinkKey(diagram, logicalKey) {
   return logicalKey;
 }
 
-/* ================= 2. NormalLink：普通连线 ================= */
+/* ================= 2. NormalLink：category 默认 / 无 category — 单线 ================= */
 class NormalLink extends go.Link {
   constructor() { super(); }
 
@@ -79,42 +79,65 @@ class NormalLink extends go.Link {
   }
 }
 
-/* ================= 3. ChainLink：双平行轨 + 轨内黑色短梯级（kind: parallel / ladder） ================= */
-class ChainLink extends go.Link {
+/**
+ * ParallelChainLink：仅绘制平行链条中的两条轨（category 为 "parallel" 或 "chain"）。
+ * 数据字段：index 0 | 1，gap；合并前仅 category:chain 且无 index 时暂画中轴。
+ */
+class ParallelChainLink extends go.Link {
   constructor() { super(); }
 
   computePoints() {
     const A = this.fromNode, B = this.toNode;
     if (!A || !B) return false;
-
     const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
     const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
     const dx = pB.x - pA.x, dy = pB.y - pA.y;
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len, ny = dx / len;
+    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
+    const idx = this.data.index;
 
     this.clearPoints();
-    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
-
-    if (this.data.kind === "parallel") {
-      const offset = this.data.index === 0 ? -halfGap : halfGap;
-      this.addPoint(new go.Point(pA.x + nx * offset, pA.y + ny * offset));
-      this.addPoint(new go.Point(pB.x + nx * offset, pB.y + ny * offset));
-    } else if (this.data.kind === "ladder") {
-      const d = this.data.d ?? 20;
-      const t = (this.data.reverse ? (len - d) : d) / len;
-      const cx = pA.x + dx * t, cy = pA.y + dy * t;
-      this.addPoint(new go.Point(cx - halfGap * nx, cy - halfGap * ny));
-      this.addPoint(new go.Point(cx + halfGap * nx, cy + halfGap * ny));
-    } else {
+    if (idx !== 0 && idx !== 1) {
       this.addPoint(pA);
       this.addPoint(pB);
+      return true;
     }
+    const offset = idx === 0 ? -halfGap : halfGap;
+    this.addPoint(new go.Point(pA.x + nx * offset, pA.y + ny * offset));
+    this.addPoint(new go.Point(pB.x + nx * offset, pB.y + ny * offset));
     return true;
   }
 }
 
-/* ================= 4. LadderLink：三角夹角红色跨边横栏（仅 category === 'ladder'） ================= */
+/**
+ * ChainRungLink：仅绘制平行轨之间的黑色短横杠（category 固定为 "rung"）。
+ * 数据字段：d，reverse?，gap。
+ */
+class ChainRungLink extends go.Link {
+  constructor() { super(); }
+
+  computePoints() {
+    const A = this.fromNode, B = this.toNode;
+    if (!A || !B) return false;
+    const pA = this.getLinkPoint(A, this.fromPort, this.computeSpot(true), true, false, B, this.toPort);
+    const pB = this.getLinkPoint(B, this.toPort, this.computeSpot(false), false, false, A, this.fromPort);
+    const dx = pB.x - pA.x, dy = pB.y - pA.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const halfGap = (this.data.gap ?? CONFIG.gap) / 2;
+    const d = this.data.d ?? 20;
+    const t = (this.data.reverse ? (len - d) : d) / len;
+    const cx = pA.x + dx * t, cy = pA.y + dy * t;
+
+    this.clearPoints();
+    this.addPoint(new go.Point(cx - halfGap * nx, cy - halfGap * ny));
+    this.addPoint(new go.Point(cx + halfGap * nx, cy + halfGap * ny));
+    return true;
+  }
+}
+
+/* ================= 3. LadderLink：category "ladder" — 三角夹角红色跨边横栏 ================= */
 class LadderLink extends go.Link {
   constructor() { 
     super(); 
@@ -159,8 +182,8 @@ class LadderLink extends go.Link {
     const dir = new go.Point(dx/len, dy/len); // 本条线的方向
     let pt = new go.Point(shared.location.x + dir.x * dist, shared.location.y + dir.y * dist);
 
-    // 如果该边是平行线，执行智能偏移
-    if (link.data.kind === "parallel") {
+    // 平行轨（由 ParallelChainLink 绘制，数据带 index 0/1）
+    if (link.data.index === 0 || link.data.index === 1) {
       const nx = -dir.y, ny = dir.x; // 获取法线
       const halfGap = (link.data.gap ?? CONFIG.gap) / 2;
       // 获取另一条线的方向，通过点积判断夹角
@@ -175,19 +198,20 @@ class LadderLink extends go.Link {
   }
 }
 
-/* ================= 5. 封装：一键生成平行轨与内部梯级 ================= */
+/* ================= 4. 封装：按 category 写入「平行轨」与「轨内横杠」两类 linkData ================= */
 function addParallelRailsForEdge(m, linkKey, from, to, customOpts = {}) {
   const startOffset = customOpts.startOffset ?? CONFIG.internalLadder.startOffset;
   const ladderSpacing = customOpts.ladderSpacing ?? CONFIG.internalLadder.ladderSpacing;
   const ladderCount = customOpts.ladderCount ?? CONFIG.internalLadder.ladderCount;
   const gap = customOpts.gap ?? CONFIG.gap;
-  const category = customOpts.category ?? "parallel";
-  m.addLinkData({ key: linkKey + "_P0", from, to, kind: "parallel", index: 0, gap, category });
-  m.addLinkData({ key: linkKey + "_P1", from, to, kind: "parallel", index: 1, gap, category });
+  const railCategory = customOpts.railCategory ?? "parallel";
+  const rungCategory = customOpts.rungCategory ?? "rung";
+  m.addLinkData({ key: linkKey + "_P0", from, to, index: 0, gap, category: railCategory });
+  m.addLinkData({ key: linkKey + "_P1", from, to, index: 1, gap, category: railCategory });
   for (let j = 0; j < ladderCount; j++) {
     const d = startOffset + j * ladderSpacing;
-    m.addLinkData({ from, to, kind: "ladder", d, gap, category });
-    m.addLinkData({ from, to, kind: "ladder", d, reverse: true, gap, category });
+    m.addLinkData({ from, to, d, gap, category: rungCategory });
+    m.addLinkData({ from, to, d, reverse: true, gap, category: rungCategory });
   }
 }
 
@@ -217,10 +241,18 @@ function convertChainToParallel(canonicalKey, otherKey, customOpts = {}) {
   m.removeLinkData(dF);
   m.removeLinkData(dR);
   registerChainKeyAliases(diagram, canonicalKey, otherKey);
-  addParallelRailsForEdge(m, canonicalKey, from, to, { ...customOpts, category: "chain" });
+  addParallelRailsForEdge(m, canonicalKey, from, to, { ...customOpts, railCategory: "chain" });
 }
 
-/* ================= 6. Diagram 初始化与运行 ================= */
+/**
+ * linkTemplateMap.category 约定（与 model 中 linkData.category 一致）：
+ *   ""        → NormalLink
+ *   "parallel"→ ParallelChainLink（单边扩成双线时的轨）
+ *   "chain"   → ParallelChainLink（A↔B 合并链条的轨）
+ *   "rung"    → ChainRungLink（轨内黑色短杠）
+ *   "ladder"  → LadderLink（三角夹角红杠）
+ */
+/* ================= 5. Diagram 初始化与运行 ================= */
 const diagram = $(go.Diagram, "diagramDiv", { "undoManager.isEnabled": true });
 diagram.linkCategoryProperty = "category";
 
@@ -228,7 +260,7 @@ diagram.linkCategoryProperty = "category";
 diagram.toolManager.draggingTool.doMouseMove = function() {
   go.DraggingTool.prototype.doMouseMove.call(this);
   diagram.links.each(l => {
-    if (l instanceof LadderLink || l instanceof ChainLink || l.data.kind) l.invalidateRoute();
+    if (l instanceof LadderLink || l instanceof ParallelChainLink || l instanceof ChainRungLink) l.invalidateRoute();
   });
 };
 
@@ -242,15 +274,17 @@ diagram.nodeTemplate = $(go.Node, "Auto", { locationSpot: go.Spot.Center },
 const linkBinding = { selectable: false };
 const edgeShape = { stroke: "#333", strokeWidth: 2 };
 const normalLinkTpl = $(NormalLink, linkBinding, $(go.Shape, edgeShape));
-const chainLinkTpl = $(ChainLink, linkBinding, $(go.Shape, edgeShape));
+const parallelChainLinkTpl = $(ParallelChainLink, linkBinding, $(go.Shape, edgeShape));
+const chainRungLinkTpl = $(ChainRungLink, linkBinding, $(go.Shape, edgeShape));
 
 diagram.linkTemplateMap.add("", normalLinkTpl);
-diagram.linkTemplateMap.add("parallel", chainLinkTpl);
-diagram.linkTemplateMap.add("chain", chainLinkTpl);
+diagram.linkTemplateMap.add("parallel", parallelChainLinkTpl);
+diagram.linkTemplateMap.add("chain", parallelChainLinkTpl);
+diagram.linkTemplateMap.add("rung", chainRungLinkTpl);
 diagram.linkTemplateMap.add("ladder", $(LadderLink, $(go.Shape, { stroke: "red", strokeWidth: 3 })));
 diagram.linkTemplate = normalLinkTpl;
 
-/* ================= 7. 数据源 ================= */
+/* ================= 6. 数据源 ================= */
 diagram.model = new go.GraphLinksModel(
   [{ key: "A", loc: "300 80" }, { key: "B", loc: "120 300" }, { key: "C", loc: "300 300" }, { key: "D", loc: "480 300" }],
   [
