@@ -20,11 +20,15 @@ class AIAnalyzer:
         self.config = get_config()
         self.ai_config = self.config.get('ai', {})
         api_key = os.getenv('OPENAI_API_KEY')
+        base_url = os.getenv('OPENAI_BASE_URL')
+        model = os.getenv('OPENAI_MODEL') or self.ai_config.get('model', 'gpt-4')
         if api_key:
-            self.client = OpenAI(api_key=api_key)
-            logger.info("AI分析器初始化完成")
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.model = model
+            logger.info(f"AI分析器初始化完成, 模型: {self.model}")
         else:
             self.client = None
+            self.model = None
             logger.warning("未配置OPENAI_API_KEY")
     
     def run_daily_analysis(self, date: Optional[str] = None, lookback_days: int = 7) -> Optional[Dict[str, Any]]:
@@ -54,7 +58,7 @@ class AIAnalyzer:
     def _call_openai_api(self, prompt: str, max_tokens: Optional[int] = None) -> Optional[str]:
         try:
             response = self.client.chat.completions.create(
-                model=self.ai_config.get('model', 'gpt-4'),
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "你是专业的量化交易分析师。"},
                     {"role": "user", "content": prompt}
