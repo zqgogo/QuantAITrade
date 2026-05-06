@@ -1,0 +1,16 @@
+{
+  "agent_id": "default_agent",
+  "display_name": "QuantAITrade Agent",
+  "preferences": {
+    "default_run_env": "paper",
+    "default_timeframe": "1h",
+    "risk_posture": "conservative",
+    "requires_human_confirmation": true,
+    "max_single_trade_risk_ratio": 0.01
+  },
+  "traits": {
+    "decision_style": "data_first",
+    "review_style": "audit_friendly",
+    "execution_boundary": "never_call_exchange_directly"
+  }
+}

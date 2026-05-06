@@ -20,6 +20,7 @@ from src.strategy import MACrossStrategy
 from src.execution import risk_controller, position_tracker, exchange_connector
 from src.ai.ai_analyzer import ai_analyzer
 from data.models import Signal, SignalType
+from src.agent.service import agent_service
 
 
 api_router = APIRouter()
@@ -43,6 +44,66 @@ class OrderRequest(BaseModel):
     order_type: str
     price: Optional[float] = None
     quantity: Optional[float] = None
+
+
+class AgentDecisionRequest(BaseModel):
+    run_env: str = "paper"
+    agent_id: str = "default_agent"
+    portfolio_id: str = "default_portfolio"
+    account_id: str = "default_account"
+    position_group_id: str = "default_group"
+    strategy_id: str = "agent_discretionary_v1"
+    asset: Dict[str, Any]
+    market_context: Dict[str, Any] = {}
+    portfolio_context: Dict[str, Any] = {}
+    risk_context: Dict[str, Any] = {}
+    memory_context: Dict[str, Any] = {}
+    user_instruction: str = "只给建议，不自动下单"
+
+
+class AgentFeedbackRequest(BaseModel):
+    feedback_type: str
+    comment: str = ""
+    executed_price: Optional[float] = None
+    executed_quantity: Optional[float] = None
+    result_snapshot: Dict[str, Any] = {}
+
+
+class AgentTradeRequest(BaseModel):
+    run_env: str = "paper"
+    portfolio_id: str = "default_portfolio"
+    account_id: str = "default_account"
+    position_group_id: str = "default_group"
+    strategy_id: str = "agent_discretionary_v1"
+    decision_id: Optional[str] = None
+    symbol: str
+    asset_class: str = "crypto"
+    side: str
+    price: float
+    quantity: float
+    status: str = "recorded"
+    source_type: str = "agent"
+    realized_pnl: float = 0.0
+    fees: float = 0.0
+    notes: str = ""
+
+
+class AgentPositionRequest(BaseModel):
+    run_env: str = "paper"
+    portfolio_id: str = "default_portfolio"
+    account_id: str = "default_account"
+    position_group_id: str = "default_group"
+    strategy_id: str = "agent_discretionary_v1"
+    symbol: str
+    asset_class: str = "crypto"
+    side: str = "long"
+    entry_price: float
+    quantity: float
+    status: str = "open"
+    realized_pnl: float = 0.0
+    unrealized_pnl: float = 0.0
+    max_drawdown: float = 0.0
+    notes: str = ""
 
 
 class HealthResponse(BaseModel):
@@ -292,6 +353,159 @@ async def trigger_ai_analysis(date: Optional[str] = None):
         return {"success": False, "message": "AI分析失败"}
     except Exception as e:
         logger.error(f"触发AI分析失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/v1/agent/init")
+async def init_agent_database():
+    """初始化 Agent 自己的数据库。"""
+    try:
+        return {"success": True, "data": agent_service.init_database()}
+    except Exception as e:
+        logger.error(f"初始化Agent失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/v1/agent/decisions")
+async def create_agent_decision(request: AgentDecisionRequest):
+    """创建 Agent 决策，记录写入 src/agent/data/agent.db。"""
+    try:
+        return {"success": True, "data": agent_service.create_decision(request.dict())}
+    except Exception as e:
+        logger.error(f"创建Agent决策失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/v1/agent/decisions")
+async def list_agent_decisions(
+    run_env: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    account_id: Optional[str] = None,
+    position_group_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = Query(default=50, le=200)
+):
+    """查询 Agent 自己的决策记录。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.list_decisions(
+                limit=limit,
+                run_env=run_env,
+                portfolio_id=portfolio_id,
+                account_id=account_id,
+                position_group_id=position_group_id,
+                symbol=symbol,
+                status=status,
+            )
+        }
+    except Exception as e:
+        logger.error(f"查询Agent决策失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/v1/agent/decisions/{decision_id}")
+async def get_agent_decision(decision_id: str):
+    """获取 Agent 决策详情。"""
+    try:
+        decision = agent_service.get_decision(decision_id)
+        if not decision:
+            raise HTTPException(status_code=404, detail="Agent decision not found")
+        return {"success": True, "data": decision}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取Agent决策失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/v1/agent/decisions/{decision_id}/feedback")
+async def submit_agent_feedback(decision_id: str, request: AgentFeedbackRequest):
+    """提交 Agent 决策反馈，并写入 Agent 记忆。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.submit_feedback(decision_id=decision_id, **request.dict())
+        }
+    except Exception as e:
+        logger.error(f"提交Agent反馈失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/v1/agent/trades")
+async def record_agent_trade(request: AgentTradeRequest):
+    """记录通过 Agent 链路产生的交易。"""
+    try:
+        return {"success": True, "data": agent_service.record_trade(request.dict())}
+    except Exception as e:
+        logger.error(f"记录Agent交易失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/v1/agent/positions")
+async def save_agent_position(request: AgentPositionRequest):
+    """保存 Agent 自己的持仓记录。"""
+    try:
+        return {"success": True, "data": agent_service.save_position(request.dict())}
+    except Exception as e:
+        logger.error(f"保存Agent持仓失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/v1/agent/positions")
+async def list_agent_positions(
+    run_env: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    account_id: Optional[str] = None,
+    position_group_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = Query(default=100, le=500)
+):
+    """查询 Agent 自己的持仓记录。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.list_positions(
+                limit=limit,
+                run_env=run_env,
+                portfolio_id=portfolio_id,
+                account_id=account_id,
+                position_group_id=position_group_id,
+                symbol=symbol,
+                status=status,
+            )
+        }
+    except Exception as e:
+        logger.error(f"查询Agent持仓失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/v1/agent/performance")
+async def get_agent_performance(
+    run_env: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    account_id: Optional[str] = None,
+    position_group_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    strategy_id: Optional[str] = None
+):
+    """获取 Agent 自己交易记录的汇总绩效。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.performance_summary(
+                run_env=run_env,
+                portfolio_id=portfolio_id,
+                account_id=account_id,
+                position_group_id=position_group_id,
+                symbol=symbol,
+                strategy_id=strategy_id,
+            )
+        }
+    except Exception as e:
+        logger.error(f"获取Agent绩效失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

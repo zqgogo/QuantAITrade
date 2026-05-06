@@ -47,6 +47,13 @@
 - AI 数据准备、Prompt 构建、OpenAI 分析、建议解析模块已存在。
 - 支持每日分析、快速分析/深度分析框架、分析结果存储。
 
+### Agent 独立化
+
+- 新增 `src/agent/` 自包含 Agent 包。
+- Agent 自有数据库、记忆、偏好、特点、技能、工具、报告、决策、反馈、交易和持仓记录均放在 Agent 包内。
+- 新增 `AgentService` 和 `python -m src.agent.runner` 独立运行入口。
+- 新增 `/api/v1/agent/*` API，外部系统可通过 API 调用 Agent，但 Agent 记录仍写入 `src/agent/data/agent.db`。
+
 ### Web 与 API
 
 - Streamlit UI 已有仪表盘、策略控制、AI 分析和设置页面。
