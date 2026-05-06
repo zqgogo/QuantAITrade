@@ -181,5 +181,6 @@ python main.py --fetch-data
 
 - `README.md`：最新项目说明、运行方式和安全提示。
 - `PROJECT_STATUS.md`：最新进度、问题和下一步计划。
+- `AI_AGENT_REFACTOR_PLAN.md`：AI Agent 独立化改造设计、API 口子、记录模型和阶段进度。
 
 历史实施报告、旧计划和旧状态文档已清理，避免与当前状态冲突。
