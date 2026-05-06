@@ -1,272 +1,185 @@
-# QuantAITrade 项目实施状态
+# QuantAITrade 项目进度
 
-## 📅 更新时间
-2025-01-06
+更新时间：2026-05-06
 
-## ✅ 已完成的模块
+## 总体判断
 
-### 1. 基础设施（100%）
-- [x] 项目目录结构创建
-- [x] `.gitignore` 配置
-- [x] `requirements.txt` 依赖清单
-- [x] `.env.example` 环境变量模板
-- [x] 快速启动脚本 `quickstart.sh`
+当前项目已经从早期原型推进到“可运行闭环雏形”阶段。主干模块基本齐全，但还不能按生产级实盘系统看待：风控细节、订单/持仓同步、Web 图表、AI 建议效果追踪、集成测试和部署监控仍需要继续补强。
 
-### 2. 配置管理系统（100%）
-- [x] `config/config.yaml` - 主配置文件
-- [x] `config/strategy_params.yaml` - 策略参数配置
-- [x] `config/ai_settings.yaml` - AI分析配置
-- [x] `config/settings.py` - 配置加载器
-- [x] `config/__init__.py` - 模块初始化
+综合完成度按代码现状估计：约 75%-85%。
 
-**特性**：
-- YAML配置 + 环境变量结合
-- 支持配置热重载
-- 便捷的配置访问接口
+## 已完成
 
-### 3. 数据模块（100%）
-- [x] `data/models.py` - 数据模型定义（7个核心模型）
-- [x] `data/db_manager.py` - SQLite数据库管理
-- [x] `data/fetcher.py` - Binance API数据获取
-- [x] `data/__init__.py` - 模块导出
+### 基础设施
 
-**功能**：
-- K线数据获取与存储
-- 增量更新机制
-- 历史数据回补（30天）
-- 数据去重与完整性检查
-- 支持多交易对、多周期
+- 项目结构、配置管理、日志系统、SQLite 数据库。
+- `.env.example`、`requirements.txt`、`quickstart.sh` 已存在。
+- 主入口 `main.py` 支持初始化数据库、获取数据和三种运行模式。
 
-**数据库表**：
-- kline_data（K线数据）
-- strategy_signals（策略信号）
-- trade_records（交易记录）
-- positions（持仓信息）
-- ai_analysis_log（AI分析）
-- backtest_results（回测结果）
+### 数据模块
 
-### 4. 主入口文件（100%）
-- [x] `main.py` - 系统启动入口
-- [x] 命令行参数支持
-- [x] 日志系统配置（loguru）
-- [x] 三种运行模式框架
+- 行情获取模块 `data/fetcher.py`。
+- 数据模型 `data/models.py`。
+- 数据库管理 `data/db_manager.py`。
+- 支持 K 线数据存储、查询、增量更新和历史回补相关能力。
 
-**命令**：
-- `--init-db` - 初始化数据库
-- `--fetch-data` - 获取历史数据
-- `--mode manual/auto/hybrid` - 启动系统
+### 策略与回测
 
-### 5. 文档（100%）
-- [x] `README.md` - 完整的项目文档
-- [x] 设计文档同步
-- [x] 使用说明
-- [x] 项目状态文档
+- 策略基类 `src/strategy/base_strategy.py`。
+- MA 交叉策略 `src/strategy/ma_cross_strategy.py`。
+- 回测引擎 `src/backtest/engine.py`。
+- 基础绩效指标、交易记录和权益曲线逻辑已经具备。
 
----
+### 风控与交易执行
 
-## 🚧 待实现的模块
+- 风控控制器 `src/execution/risk_controller.py`。
+- 交易所连接器、订单管理器、持仓跟踪器、统一交易执行器。
+- 支持风控检查、止损计算、信号提交、订单处理和持仓监控的主流程。
 
-### 6. 策略系统（0%）
-**优先级**：高
+### 调度与状态管理
 
-需要实现：
-- [ ] `strategy/base_strategy.py` - 策略基类
-- [ ] `strategy/ma_cross_strategy.py` - 均线交叉策略
-- [ ] `strategy/macd_mean_reversion.py` - MACD策略
-- [ ] `strategy/boll_strategy.py` - 布林带策略
-- [ ] `strategy/strategy_loader.py` - 策略动态加载器
+- APScheduler 调度器 `src/orchestrator/scheduler.py`。
+- 系统状态、任务日志、信号队列、恢复管理、健康检查等工具模块。
+- 主程序中已经接入心跳、数据获取、策略分析、订单同步、持仓监控、AI 分析等定时任务。
 
-**预计工作量**：2-3天
+### AI 分析
 
-### 7. 回测引擎（0%）
-**优先级**：高
+- AI 数据准备、Prompt 构建、OpenAI 分析、建议解析模块已存在。
+- 支持每日分析、快速分析/深度分析框架、分析结果存储。
 
-需要实现：
-- [ ] `backtest/engine.py` - 回测引擎核心
-- [ ] `backtest/performance_analyzer.py` - 绩效分析
-- [ ] `backtest/report_generator.py` - 报告生成
+### Web 与 API
 
-**预计工作量**：2天
+- Streamlit UI 已有仪表盘、策略控制、AI 分析和设置页面。
+- FastAPI 服务已存在，包含健康检查、JWT token、策略、订单、持仓、AI、系统状态等基础接口。
 
-### 8. 风控模块（0%）
-**优先级**：最高（涉及资金安全）
+### 测试
 
-需要实现：
-- [ ] `execution/risk_controller.py` - 风控检查
-  - 单仓位限制
-  - 总仓位控制
-  - 每日交易次数限制
-  - 价格偏差检查
-- [ ] 灵活止损机制
-  - 固定百分比止损
-  - 关键点位止损
-  - ATR动态止损
-  - 移动止损
-  - 时间止损
-  - 手动止损
+- `test_system.py` 覆盖配置、数据库、策略、风控、回测引擎的基础冒烟测试。
+- `test_task_state_management.py` 覆盖任务状态管理相关能力。
 
-**预计工作量**：2天
+## 主要问题
 
-### 9. 订单执行模块（0%）
-**优先级**：高
+### P0：实盘前必须处理
 
-需要实现：
-- [ ] `execution/order_manager.py` - 订单管理
-- [ ] `execution/position_tracker.py` - 仓位跟踪
-- [ ] `execution/exchange_connector.py` - 交易所连接
+1. 风控模块仍有关键 TODO：
+   - 市场价格获取与价格偏差检查。
+   - 关键点位止损从历史数据计算。
+   - ATR 止损从历史数据计算。
+   - 今日交易次数从数据库查询。
 
-**预计工作量**：2天
+2. 订单与持仓一致性还需要落地：
+   - `main.py` 中订单同步和持仓验证任务仍是框架逻辑。
+   - API 下单接口目前偏模拟返回，没有完整穿透到真实订单生命周期。
 
-### 10. AI分析模块（0%）
-**优先级**：中
+3. 生产安全配置不足：
+   - API 默认密码和默认 JWT secret 需要强制配置。
+   - CORS 当前放开为 `*`，生产环境需要收紧。
+   - 实盘模式需要明确保护开关和二次确认机制。
 
-需要实现：
-- [ ] `ai/ai_analyzer.py` - AI分析引擎
-- [ ] `ai/daily_report.py` - 每日报告生成
-- [ ] `ai/suggestion_parser.py` - 建议解析
-- [ ] `ai/prompt_templates.py` - 提示词模板
+### P1：本周优先
 
-**预计工作量**：2天
+1. Web UI 的核心图表和统计仍有预留：
+   - 策略绩效图表。
+   - 权益曲线。
+   - 最大回撤、胜率、夏普比率、总盈亏。
+   - 信号分析图表和参数修改历史。
 
-### 11. 任务调度器（0%）
-**优先级**：中
+2. AI 建议闭环未完成：
+   - 建议采纳率统计。
+   - 建议效果追踪。
+   - 参数调整、策略启停、风控设置调整等建议动作还未真正落地。
 
-需要实现：
-- [ ] `orchestrator/scheduler.py` - APScheduler集成
-- [ ] `orchestrator/task_manager.py` - 任务管理
-- [ ] `orchestrator/workflow.py` - 工作流编排
+3. 测试覆盖不足：
+   - 缺少端到端交易流程测试。
+   - 缺少三种运行模式测试。
+   - 缺少异常恢复、订单失败、交易所不可用等场景测试。
 
-**预计工作量**：1-2天
+### P2：后续增强
 
-### 12. Web界面（0%）
-**优先级**：低（可后期开发）
+1. 策略数量较少：
+   - 目前主要是 MA 交叉策略。
+   - MACD、布林带、均值回归、策略动态加载器仍可补充。
 
-需要实现：
-- [ ] `ui/app.py` - Streamlit主应用
-- [ ] `ui/pages/dashboard.py` - 仪表盘
-- [ ] `ui/pages/strategy_control.py` - 策略控制
-- [ ] `ui/pages/ai_review.py` - AI审核
-- [ ] `ui/pages/backtest.py` - 回测可视化
-- [ ] `ui/components/charts.py` - 图表组件
-- [ ] `ui/components/trade_log.py` - 日志组件
+2. 性能和数据层优化：
+   - 数据库索引和查询性能需要复查。
+   - 可加入缓存、批处理、异步任务和数据归档。
 
-**预计工作量**：3-4天
+3. 部署和监控：
+   - 缺少 Docker/部署文档。
+   - 缺少 Prometheus/Grafana 或等效监控。
+   - 通知告警模块需要完整验证。
 
----
+## 建议下一步
 
-## 📊 项目完成度
+### 第一步：先跑通本地环境
 
-### 总体进度：30%
-
-| 模块 | 完成度 | 状态 |
-|------|--------|------|
-| 基础设施 | 100% | ✅ 完成 |
-| 配置系统 | 100% | ✅ 完成 |
-| 数据模块 | 100% | ✅ 完成 |
-| 主入口 | 100% | ✅ 完成 |
-| 文档 | 100% | ✅ 完成 |
-| 策略系统 | 0% | ⏳ 待实现 |
-| 回测引擎 | 0% | ⏳ 待实现 |
-| 风控模块 | 0% | ⏳ 待实现 |
-| 执行模块 | 0% | ⏳ 待实现 |
-| AI分析 | 0% | ⏳ 待实现 |
-| 调度器 | 0% | ⏳ 待实现 |
-| Web界面 | 0% | ⏳ 待实现 |
-
----
-
-## 🎯 下一步计划
-
-### 第一优先级（核心交易功能）
-1. **策略系统** - 实现基类和三个内置策略
-2. **风控模块** - 实现完整的止损和风控机制
-3. **执行模块** - 实现订单管理和仓位跟踪
-
-### 第二优先级（测试验证）
-4. **回测引擎** - 验证策略有效性
-5. **调度器** - 实现自动化运行
-
-### 第三优先级（增强功能）
-6. **AI分析** - 集成AI建议
-7. **Web界面** - 提供可视化管理
-
----
-
-## 🛠️ 当前可用功能
-
-虽然核心交易功能尚未完成，但已实现的模块可以独立使用：
-
-### 1. 数据获取与存储
 ```bash
-# 初始化数据库
+source venv/bin/activate
+pip install -r requirements.txt
+python test_system.py
+python test_task_state_management.py
 python main.py --init-db
+```
 
-# 获取历史数据
+如果要验证行情获取：
+
+```bash
 python main.py --fetch-data
 ```
 
-### 2. 配置管理
-```python
-from config import get_config, get_strategy_config
+### 第二步：补齐核心风控
 
-# 读取配置
-config = get_config()
-print(config['trading']['symbols'])
-```
+优先修改 `src/execution/risk_controller.py`：
 
-### 3. 数据库查询
-```python
-from data import db_manager
+- 接入交易所当前价格或最新 K 线价格，完成价格偏差检查。
+- 复用策略基类里的支撑位/ATR 计算逻辑，补齐关键点位和 ATR 止损。
+- 从 `trade_records` 查询今日交易次数。
+- 增加针对风控拒绝/通过的单元测试。
 
-# 查询K线数据
-klines = db_manager.get_klines('BTCUSDT', '1h', limit=100)
-```
+### 第三步：把订单同步和持仓验证做实
 
----
+优先修改：
 
-## 📝 开发建议
+- `main.py`
+- `src/execution/order_manager.py`
+- `src/execution/position_tracker.py`
+- `src/execution/exchange_connector.py`
 
-### 推荐开发顺序
+目标：
 
-1. **策略基类** → 定义统一接口
-2. **简单策略** → MA交叉策略（最简单）
-3. **回测引擎** → 验证策略逻辑
-4. **风控模块** → 保护资金安全
-5. **订单执行** → 连接交易所
-6. **完整测试** → 模拟盘验证
-7. **AI集成** → 增强决策
-8. **Web界面** → 可视化管理
+- 系统启动时恢复未完成订单。
+- 定时同步交易所订单状态。
+- 对比本地持仓和交易所持仓。
+- 对异常状态给出告警或自动修复策略。
 
-### 开发注意事项
+### 第四步：完善 UI 与 AI 闭环
 
-1. **测试优先**：每个模块都应先在测试网验证
-2. **小步迭代**：先实现基本功能，再逐步完善
-3. **日志完善**：关键操作必须记录日志
-4. **异常处理**：API调用、数据库操作都要有异常捕获
-5. **配置化**：所有参数都应可配置，避免硬编码
+优先修改：
 
----
+- `src/ui/pages/dashboard.py`
+- `src/ui/pages/strategy_control.py`
+- `src/ui/pages/ai_analysis.py`
+- `src/ai/ai_suggestion_parser.py`
 
-## 🔗 相关资源
+目标：
 
-- **设计文档**：`.qoder/quests/document-review-and-implementation.md`
-- **配置文件**：`config/`目录
-- **API文档**：
-  - Binance API: https://binance-docs.github.io/apidocs/
-  - ccxt文档: https://docs.ccxt.com/
-  - OpenAI API: https://platform.openai.com/docs/
+- 用真实数据库数据生成仪表盘指标和图表。
+- 实现参数修改历史。
+- 追踪 AI 建议是否采纳、采纳后效果如何。
+- 将可执行建议映射到配置更新或策略控制。
 
----
+### 第五步：补集成测试
 
-## 📞 支持
+建议新增：
 
-如有问题，请查看：
-1. README.md - 使用说明
-2. 设计文档 - 完整设计方案
-3. 代码注释 - 详细的实现说明
+- 模拟交易所连接器测试。
+- 信号生成到风控到下单的端到端测试。
+- manual/auto/hybrid 三种模式调度测试。
+- 异常中断后的状态恢复测试。
 
----
+## 当前保留文档
 
-**最后更新**：2025-01-06
-**当前版本**：v0.3.0-alpha
-**下一个里程碑**：v0.5.0（完成策略系统和回测引擎）
+- `README.md`：最新项目说明、运行方式和安全提示。
+- `PROJECT_STATUS.md`：最新进度、问题和下一步计划。
+
+历史实施报告、旧计划和旧状态文档已清理，避免与当前状态冲突。

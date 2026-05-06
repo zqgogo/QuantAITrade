@@ -17,7 +17,7 @@ source venv/bin/activate
 
 # 安装依赖
 echo "安装依赖..."
-pip install -q loguru pyyaml python-dotenv ccxt
+pip install -r requirements.txt
 
 # 运行系统
 echo ""
