@@ -1,12 +1,14 @@
 # QuantAITrade 项目进度
 
-更新时间：2026-05-06
+更新时间：2026-05-09
 
 ## 总体判断
 
 当前项目已经从早期原型推进到“可运行闭环雏形”阶段。主干模块基本齐全，但还不能按生产级实盘系统看待：风控细节、订单/持仓同步、Web 图表、AI 建议效果追踪、集成测试和部署监控仍需要继续补强。
 
 综合完成度按代码现状估计：约 75%-85%。
+
+Agent 独立化子系统完成度按当前代码估计：约 55%-65%。它已经可独立运行、可 API/SDK 调用、可记录和审计，但报告生成、UI 展示、LLM 复盘和专门测试仍待补齐。
 
 ## 已完成
 
@@ -53,6 +55,9 @@
 - Agent 自有数据库、记忆、偏好、特点、技能、工具、报告、决策、反馈、交易和持仓记录均放在 Agent 包内。
 - 新增 `AgentService` 和 `python -m src.agent.runner` 独立运行入口。
 - 新增 `/api/v1/agent/*` API，外部系统可通过 API 调用 Agent，但 Agent 记录仍写入 `src/agent/data/agent.db`。
+- Agent 决策脑已升级为 `multi_factor_v1`，支持多周期、多指标、多空双向建议；当前仍只给建议，不直接下单。
+- Agent Skill 已拆成可调用模块，`brain.py` 通过 `skills/registry.py` 调用 `multi_timeframe_strategy` 和 `risk_review`。
+- Agent 已新增第一版学习、条件审计、日/周/月/年总结能力，接口为 `/api/v1/agent/audit` 和 `/api/v1/agent/summary`。
 
 ### Web 与 API
 
@@ -63,6 +68,7 @@
 
 - `test_system.py` 覆盖配置、数据库、策略、风控、回测引擎的基础冒烟测试。
 - `test_task_state_management.py` 覆盖任务状态管理相关能力。
+- Agent 当前已通过手动验证：`python -m compileall src/agent src/api/routes.py`、CLI 决策、审计查询、月度总结和 API 路由注册。
 
 ## 主要问题
 
@@ -84,6 +90,12 @@
    - 实盘模式需要明确保护开关和二次确认机制。
 
 ### P1：本周优先
+
+0. Agent 后续完善：
+   - 为 `src/agent/skills/`、`src/agent/audit.py`、`src/agent/analyzer.py` 增加单元测试。
+   - 在 UI 增加 Agent 决策详情页，展示多周期投票、long_plan、short_plan 和风险复核。
+   - 新增报告生成 Skill，支持日/周/月/年 Markdown 报告。
+   - 新增历史相似行情检索 Skill 和 LLM 复盘 Skill。
 
 1. Web UI 的核心图表和统计仍有预留：
    - 策略绩效图表。
@@ -189,5 +201,8 @@ python main.py --fetch-data
 - `README.md`：最新项目说明、运行方式和安全提示。
 - `PROJECT_STATUS.md`：最新进度、问题和下一步计划。
 - `AI_AGENT_REFACTOR_PLAN.md`：AI Agent 独立化改造设计、API 口子、记录模型和阶段进度。
+- `src/agent/README.md`：Agent 快速使用说明。
+- `src/agent/AGENT_DESIGN.md`：Agent 内部设计、Skill/Tool、学习、审计、总结说明。
+- `src/agent/AGENT_HANDOFF.md`：Agent 交接与外部接入说明，后续其他系统接入优先看这个。
 
 历史实施报告、旧计划和旧状态文档已清理，避免与当前状态冲突。

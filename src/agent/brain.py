@@ -1,11 +1,12 @@
 """Agent decision brain.
 
-First implementation is deterministic and audit-friendly. It can be replaced
-or extended with an LLM later without changing the service/database contract.
+The agent does not place orders. It builds an auditable market view, compares
+long and short scenarios, then returns a suggestion with invalidation levels.
 """
 
 from .config import DEFAULT_PROMPT_VERSION
 from .schemas import AgentAction, AgentContext, AgentDecision, new_id, utc_ts
+from .skills import skill_registry
 
 
 class AgentBrain:
@@ -15,40 +16,22 @@ class AgentBrain:
         memory = context.memory_context or {}
 
         latest_price = market.get("latest_price")
-        trend = market.get("trend")
+        frames = market.get("timeframes") or {}
         open_positions = portfolio.get("open_position_count", 0)
+        analysis = skill_registry.run("multi_timeframe_strategy", {"market": market})
 
         if not latest_price:
             action = AgentAction.OBSERVE.value
             confidence = 0.25
-            reasoning = "行情数据不足，无法形成可靠交易判断。"
-            risk_notes = "等待数据补齐；禁止在无价格快照时执行。"
-        elif trend == "up" and open_positions == 0:
-            action = AgentAction.BUY.value
-            confidence = 0.68
-            reasoning = "短周期均线高于长周期均线，且当前仓位组没有未平仓持仓。"
-            risk_notes = "建议小仓试探；单笔风险应控制在 Agent 偏好设定以内。"
-        elif trend == "down" and open_positions > 0:
-            action = AgentAction.REDUCE.value
-            confidence = 0.64
-            reasoning = "短周期均线低于长周期均线，当前仓位组已有敞口，优先降低风险。"
-            risk_notes = "若跌破止损价，应由执行层触发平仓或人工确认。"
-        elif trend == "down":
-            action = AgentAction.OBSERVE.value
-            confidence = 0.55
-            reasoning = "趋势偏弱，但当前仓位组没有持仓，不追空，先观察。"
-            risk_notes = "避免在弱势环境中逆势开仓。"
+            reasoning = "行情数据不足，无法完成多周期趋势、波动和关键价位分析。"
+            risk_notes = "等待最新与历史行情补齐；只允许记录观察，不给入场建议。"
         else:
-            action = AgentAction.HOLD.value
-            confidence = 0.5
-            reasoning = "趋势信号不明确，暂不调整。"
-            risk_notes = "等待更清晰的价格、成交量或风险信号。"
+            action, confidence = self._choose_action(analysis, open_positions)
+            reasoning = self._build_reasoning(analysis, frames, open_positions)
+            risk_review = skill_registry.run("risk_review", {"analysis": analysis, "action": action})
+            risk_notes = self._build_risk_notes(risk_review)
 
-        stop_loss = {}
-        take_profit = {}
-        if latest_price and action in {AgentAction.BUY.value, AgentAction.HOLD.value}:
-            stop_loss = {"type": "price", "price": round(float(latest_price) * 0.97, 8)}
-            take_profit = {"type": "price", "price": round(float(latest_price) * 1.06, 8)}
+        stop_loss, take_profit = self._build_trade_levels(analysis, action)
 
         profile = memory.get("profile", {})
         preferences = profile.get("preferences", {})
@@ -83,14 +66,80 @@ class AgentBrain:
             risk_snapshot=context.risk_context,
             memory_snapshot=memory,
             metadata={
-                "brain": "deterministic_v1",
+                "brain": "multi_factor_v1",
                 "prompt_version": DEFAULT_PROMPT_VERSION,
                 "created_by": "src.agent.brain.AgentBrain",
+                "analysis": analysis,
+                "strategy": self._strategy_summary(analysis),
+                "skills": skill_registry.describe(),
             },
             created_at=utc_ts(),
             updated_at=utc_ts(),
         )
 
+    def _choose_action(self, analysis: dict, open_positions: int) -> tuple[str, float]:
+        bias = analysis["market_bias"]
+        direction_score = abs(float(analysis["direction_score"]))
+        confidence = min(0.88, 0.45 + direction_score * 0.35)
+        if analysis["available_timeframes"] < 2:
+            return AgentAction.OBSERVE.value, min(confidence, 0.45)
+        if bias == "bullish":
+            return AgentAction.BUY.value, confidence
+        if bias == "bearish":
+            return (AgentAction.REDUCE.value if open_positions else AgentAction.SELL.value), confidence
+        return AgentAction.HOLD.value if open_positions else AgentAction.OBSERVE.value, min(confidence, 0.55)
+
+    def _build_reasoning(self, analysis: dict, frames: dict, open_positions: int) -> str:
+        votes = analysis["frame_votes"]
+        vote_text = "；".join(
+            f"{name}: {item['trend']} score={item['score']}"
+            for name, item in votes.items()
+        ) or "无有效周期"
+        long_plan = analysis["long_plan"]
+        short_plan = analysis["short_plan"]
+        return (
+            f"多周期综合偏向：{analysis['market_bias']}，方向分={analysis['direction_score']}。"
+            f"周期投票：{vote_text}。"
+            f"当前结构：{analysis['regime']}，RSI={self._fmt(analysis.get('rsi'))}，"
+            f"ATR%={self._fmt(analysis.get('atr_percent'))}。"
+            f"关键支撑={self._fmt(analysis.get('support'))}，关键压力={self._fmt(analysis.get('resistance'))}。"
+            f"多头方案：入场区 {long_plan['entry_zone']}，失效 {long_plan['invalidation']}，目标 {long_plan['targets']}。"
+            f"空头方案：入场区 {short_plan['entry_zone']}，失效 {short_plan['invalidation']}，目标 {short_plan['targets']}。"
+            f"当前仓位组持仓数={open_positions}。"
+        )
+
+    def _build_risk_notes(self, risk_review: dict) -> str:
+        warnings = risk_review.get("warnings") or []
+        return f"{risk_review.get('summary', '')}。" + ("；".join(warnings) if warnings else "等待价格触发计划，不提前执行。")
+
+    def _build_trade_levels(self, analysis: dict, action: str) -> tuple[dict, dict]:
+        if action == AgentAction.BUY.value:
+            plan = analysis["long_plan"]
+        elif action == AgentAction.SELL.value:
+            plan = analysis["short_plan"]
+        else:
+            return {}, {}
+        return (
+            {"type": "invalidation", "price": plan["invalidation"], "reason": plan["invalidation_reason"]},
+            {"type": "targets", "prices": plan["targets"]},
+        )
+
+    def _strategy_summary(self, analysis: dict) -> dict:
+        return {
+            "name": "multi_timeframe_momentum_reversion",
+            "description": "结合多周期趋势、均线结构、MACD、RSI、布林位置、ATR、支撑压力和成交量的建议策略。",
+            "market_bias": analysis["market_bias"],
+            "long_enabled": analysis["market_bias"] in {"bullish", "neutral"},
+            "short_enabled": analysis["market_bias"] in {"bearish", "neutral"},
+            "risk_model": "ATR + support/resistance invalidation",
+        }
+
+    def _fmt(self, value: object) -> str:
+        if value is None:
+            return "N/A"
+        if isinstance(value, float):
+            return f"{value:.4f}"
+        return str(value)
+
 
 agent_brain = AgentBrain()
-

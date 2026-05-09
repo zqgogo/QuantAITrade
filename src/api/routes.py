@@ -509,6 +509,86 @@ async def get_agent_performance(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/api/v1/agent/audit")
+async def audit_agent_records(
+    record_type: str = Query(default="decisions", description="decisions/feedback/trades/positions/memories/reports"),
+    run_env: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    account_id: Optional[str] = None,
+    position_group_id: Optional[str] = None,
+    strategy_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    action: Optional[str] = None,
+    side: Optional[str] = None,
+    status: Optional[str] = None,
+    feedback_type: Optional[str] = None,
+    memory_type: Optional[str] = None,
+    start_ts: Optional[int] = None,
+    end_ts: Optional[int] = None,
+    limit: int = Query(default=100, le=1000),
+    offset: int = Query(default=0, ge=0)
+):
+    """按条件审计 Agent 自己的全量记录。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.audit_records(
+                record_type=record_type,
+                limit=limit,
+                offset=offset,
+                run_env=run_env,
+                agent_id=agent_id,
+                portfolio_id=portfolio_id,
+                account_id=account_id,
+                position_group_id=position_group_id,
+                strategy_id=strategy_id,
+                symbol=symbol,
+                action=action,
+                side=side,
+                status=status,
+                feedback_type=feedback_type,
+                memory_type=memory_type,
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+        }
+    except Exception as e:
+        logger.error(f"Agent审计查询失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/v1/agent/summary")
+async def get_agent_period_summary(
+    period: str = Query(default="month", description="day/week/month/year"),
+    date: Optional[str] = Query(default=None, description="YYYY-MM-DD，默认当前日期"),
+    run_env: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    account_id: Optional[str] = None,
+    position_group_id: Optional[str] = None,
+    strategy_id: Optional[str] = None,
+    symbol: Optional[str] = None
+):
+    """获取 Agent 日/周/月/年总结。"""
+    try:
+        return {
+            "success": True,
+            "data": agent_service.period_summary(
+                period=period,
+                date=date,
+                run_env=run_env,
+                portfolio_id=portfolio_id,
+                account_id=account_id,
+                position_group_id=position_group_id,
+                strategy_id=strategy_id,
+                symbol=symbol,
+            )
+        }
+    except Exception as e:
+        logger.error(f"Agent周期总结失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/api/v1/system/status")
 async def get_system_status():
     """

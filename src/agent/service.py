@@ -2,8 +2,10 @@
 
 from typing import Any, Dict, Optional
 
+from .analyzer import agent_analyzer
 from .adapters.market_data import market_data_adapter
 from .adapters.portfolio import portfolio_adapter
+from .audit import agent_auditor
 from .brain import agent_brain
 from .config import DEFAULT_AGENT_ID
 from .database import agent_db
@@ -28,9 +30,10 @@ class AgentService:
         context = self._build_context(payload)
 
         if not context.market_context:
-            context.market_context = market_data_adapter.get_snapshot(
+            context.market_context = market_data_adapter.get_multi_timeframe_snapshot(
                 context.asset.symbol,
-                payload.get("interval") or payload.get("timeframe") or "1h",
+                payload.get("intervals"),
+                payload.get("limit", 160),
             )
 
         if not context.portfolio_context:
@@ -103,6 +106,15 @@ class AgentService:
             notes=payload.get("notes", ""),
         )
         agent_db.save_trade(trade)
+        agent_memory.add_memory(
+            summary=(
+                f"{trade.run_env} {trade.symbol} {trade.side} 交易记录："
+                f"价格 {trade.price}，数量 {trade.quantity}，已实现盈亏 {trade.realized_pnl}。"
+            ),
+            memory_type="trade_result",
+            payload=trade.to_dict(),
+            importance=0.8 if trade.realized_pnl != 0 else 0.5,
+        )
         return trade.to_dict()
 
     def save_position(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -132,6 +144,12 @@ class AgentService:
 
     def performance_summary(self, **filters: Any) -> Dict[str, Any]:
         return agent_db.summarize_performance(**filters)
+
+    def audit_records(self, record_type: str = "decisions", limit: int = 100, offset: int = 0, **filters: Any) -> Dict[str, Any]:
+        return agent_auditor.query(record_type=record_type, limit=limit, offset=offset, **filters)
+
+    def period_summary(self, period: str = "month", date: Optional[str] = None, **filters: Any) -> Dict[str, Any]:
+        return agent_analyzer.summarize_period(period=period, date=date, **filters)
 
     def init_database(self) -> Dict[str, Any]:
         agent_db.init_database()
@@ -166,4 +184,3 @@ class AgentService:
 
 
 agent_service = AgentService()
-
