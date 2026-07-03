@@ -39,10 +39,13 @@
 
 ### AI
 
-- 接口：OpenAI Compatible provider 抽象。
+- 接口：OpenAI Compatible provider 抽象，本地 Ollama 与远程 API 使用同一套 `base_url/api_key/model` 配置。
 - 第一阶段只预留模块边界。
 - 后续先实现 On-Demand Trigger，跑通 Context Assembler -> Prompt Builder -> AI Client -> Output Parser -> Persist/Delivery。
 - 向量数据库先通过 `MemoryStore` 接口隔离，默认实现可用 ChromaDB；不要让业务模块直接依赖 Chroma API。
+- 配置方式参考 MailTidy：只提交 `config/llm.config.demo.json`，真实 `config/llm.config.json` 由本地复制并填写，已加入 `.gitignore`。
+- 本地优先：默认 LLM provider 为 Ollama，默认 embedding 为 `BAAI/bge-m3`。
+- Agent 框架：先保留 Ledgerline 自带轻量 runtime，同时预留 `pi_coding_agent` runtime 配置和 adapter 边界。
 
 ## 技术方案复核结论
 
@@ -60,6 +63,7 @@
 - 前端依赖从 Next 15 校准到 Next 16 当前线。
 - Phase 1 增加 Alembic、WAL、Repository/Service 分层和 `MemoryStore` 抽象。
 - 图表库、全局状态库、UI 组件库暂缓到 Trade/Portfolio 页面开始时再定，避免骨架期过度设计。
+- AI 配置改为本地优先但可切 API：`ollama` / `openai` / `zhipu` 通过 demo JSON 切换，后续可继续增加 provider。
 
 ## 目录状态
 

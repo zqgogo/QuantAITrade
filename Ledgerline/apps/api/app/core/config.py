@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_origins: list[str] = ["http://localhost:3000"]
     data_dir: Path = Path("var")
+    config_dir: Path = Path("../../config")
+    llm_config_file: str = "llm.config.json"
+    llm_demo_config_file: str = "llm.config.demo.json"
     trading_database_url: str = "sqlite:///./var/trading.db"
     market_database_url: str = "sqlite:///./var/market.db"
     chroma_path: str = "./var/chroma"
@@ -23,4 +26,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

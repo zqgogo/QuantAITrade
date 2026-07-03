@@ -43,6 +43,20 @@ Persistence
 - AI consumes context from other modules but core modules do not depend on AI.
 - Reports persist generated snapshots and can also be indexed in vector storage.
 
+## AI Configuration
+
+Ledgerline uses a private local config file for AI settings:
+
+- Commit: `config/llm.config.demo.json`
+- Local only: `config/llm.config.json`
+
+The config keeps LLM providers, embedding provider, vector store, and agent runtime separate. The default path is local-first:
+
+- LLM: Ollama-compatible OpenAI endpoint.
+- Embedding: `BAAI/bge-m3`.
+- Vector store: ChromaDB.
+- Agent runtime: built-in `ledgerline`, with `pi_coding_agent` reserved as a switchable runtime.
+
 ## Frontend Pages
 
 - Dashboard: overview and today context.
@@ -52,4 +66,3 @@ Persistence
 - AI Chat: on-demand analysis.
 - Reports: daily, weekly, monthly reviews.
 - Settings: data sources, AI provider, token settings.
-

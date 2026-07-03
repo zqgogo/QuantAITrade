@@ -1,0 +1,85 @@
+{
+  "providers": {
+    "ollama": {
+      "name": "ollama_local",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "api_mode": "chat_completions",
+      "models": [
+        {
+          "id": "qwen3:8b",
+          "name": "Qwen3 8B Local"
+        },
+        {
+          "id": "qwen2.5:7b",
+          "name": "Qwen2.5 7B Local"
+        }
+      ],
+      "default_model": "qwen3:8b",
+      "temperature": 0.2,
+      "max_tokens": 1200
+    },
+    "openai": {
+      "name": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "YOUR_OPENAI_API_KEY_HERE",
+      "api_mode": "chat_completions",
+      "models": [
+        {
+          "id": "gpt-5.5-mini",
+          "name": "GPT-5.5 Mini"
+        },
+        {
+          "id": "gpt-5.5",
+          "name": "GPT-5.5"
+        }
+      ],
+      "default_model": "gpt-5.5-mini",
+      "temperature": 0.2,
+      "max_tokens": 1200
+    },
+    "zhipu": {
+      "name": "zhipu_glm",
+      "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "api_key": "YOUR_ZHIPU_API_KEY_HERE",
+      "api_mode": "chat_completions",
+      "models": [
+        {
+          "id": "glm-4.7-flash",
+          "name": "GLM-4.7-flash"
+        },
+        {
+          "id": "glm-4-plus",
+          "name": "GLM-4-Plus"
+        }
+      ],
+      "default_model": "glm-4.7-flash",
+      "temperature": 0.2,
+      "max_tokens": 1200
+    }
+  },
+  "active_provider": "ollama",
+  "embedding": {
+    "provider": "local",
+    "model": "BAAI/bge-m3",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "YOUR_EMBEDDING_API_KEY_HERE",
+    "device": "auto",
+    "dimensions": 1024,
+    "normalize": true
+  },
+  "vector_store": {
+    "provider": "chromadb",
+    "path": "./var/chroma",
+    "collection_prefix": "ledgerline"
+  },
+  "agent": {
+    "runtime": "ledgerline",
+    "available_runtimes": [
+      "ledgerline",
+      "pi_coding_agent"
+    ],
+    "allow_trade_execution": false,
+    "max_tool_calls": 6
+  }
+}
