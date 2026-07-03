@@ -1,0 +1,2 @@
+"""Plugin strategy module."""
+

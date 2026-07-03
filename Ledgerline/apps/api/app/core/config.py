@@ -1,0 +1,26 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    app_name: str = "Ledgerline API"
+    app_version: str = "0.1.0"
+    environment: str = "development"
+    cors_origins: list[str] = ["http://localhost:3000"]
+    data_dir: Path = Path("var")
+    trading_database_url: str = "sqlite:///./var/trading.db"
+    market_database_url: str = "sqlite:///./var/market.db"
+    chroma_path: str = "./var/chroma"
+
+    model_config = SettingsConfigDict(env_prefix="LEDGERLINE_", env_file=".env")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
+
