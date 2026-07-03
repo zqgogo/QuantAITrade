@@ -1,0 +1,169 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import Any
+
+from app.modules.trading.models import Position, Transaction, TransactionType
+from app.modules.trading.repository import TradingRepository
+
+
+class PositionAggregate:
+    def __init__(self, position: Position, transactions: list[Transaction]):
+        self.position = position
+        self.transactions = sorted(transactions, key=lambda t: t.executed_at)
+        self._calculate()
+
+    def _calculate(self) -> None:
+        if not self.transactions:
+            self.total_quantity = Decimal(0)
+            self.avg_price = Decimal(0)
+            return
+
+        buys = [t for t in self.transactions if t.type in (TransactionType.OPEN, TransactionType.ADD)]
+        sells = [t for t in self.transactions if t.type in (TransactionType.REDUCE, TransactionType.CLOSE)]
+
+        total_buy_quantity = sum(t.quantity for t in buys)
+        total_buy_value = sum(t.price * t.quantity for t in buys)
+
+        total_sell_quantity = sum(t.quantity for t in sells)
+
+        self.total_quantity = total_buy_quantity - total_sell_quantity
+        self.avg_price = total_buy_value / total_buy_quantity if total_buy_quantity > 0 else Decimal(0)
+
+    def to_dict(self, current_price: Decimal | None = None) -> dict[str, Any]:
+        base = {
+            "position_id": self.position.id,
+            "portfolio_id": self.position.portfolio_id,
+            "market": self.position.market,
+            "symbol": self.position.symbol,
+            "side": self.position.side,
+            "status": self.position.status,
+            "opened_at": self.position.opened_at.isoformat() if self.position.opened_at else None,
+            "closed_at": self.position.closed_at.isoformat() if self.position.closed_at else None,
+            "total_quantity": float(self.total_quantity),
+            "avg_price": float(self.avg_price),
+        }
+
+        if current_price is not None:
+            if self.position.side == "long":
+                pnl = (current_price - self.avg_price) * self.total_quantity
+                pnl_pct = ((current_price - self.avg_price) / self.avg_price * 100) if self.avg_price > 0 else Decimal(0)
+            else:
+                pnl = (self.avg_price - current_price) * self.total_quantity
+                pnl_pct = ((self.avg_price - current_price) / self.avg_price * 100) if self.avg_price > 0 else Decimal(0)
+
+            base.update({
+                "current_price": float(current_price),
+                "pnl": float(pnl),
+                "pnl_pct": float(pnl_pct),
+            })
+
+        return base
+
+
+class TradingService:
+    def __init__(self, repository: TradingRepository | None = None):
+        self.repository = repository or TradingRepository()
+
+    def ensure_default_workspace(self) -> int:
+        workspace = self.repository.get_workspace_by_name("Trading")
+        if not workspace:
+            workspace = self.repository.create_workspace("Trading")
+        return workspace.id
+
+    def ensure_default_portfolio(self, workspace_id: int) -> int:
+        portfolios = self.repository.get_portfolios_by_workspace(workspace_id)
+        if not portfolios:
+            portfolio = self.repository.create_portfolio(workspace_id, "Default")
+            return portfolio.id
+        return portfolios[0].id
+
+    def record_transaction(
+        self,
+        portfolio_id: int,
+        market: str,
+        symbol: str,
+        side: str,
+        type: TransactionType,
+        price: Decimal,
+        quantity: Decimal,
+        executed_at: datetime,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        open_positions = self.repository.get_open_positions(portfolio_id)
+        position = None
+
+        for pos in open_positions:
+            if pos.market == market and pos.symbol == symbol and pos.side == side:
+                position = pos
+                break
+
+        if not position and type != TransactionType.OPEN:
+            raise ValueError("No open position found for this symbol and side")
+
+        if not position:
+            position = self.repository.create_position(
+                portfolio_id=portfolio_id,
+                market=market,
+                symbol=symbol,
+                side=side,
+                opened_at=executed_at,
+            )
+
+        transaction = self.repository.create_transaction(
+            position_id=position.id,
+            type=type,
+            price=price,
+            quantity=quantity,
+            executed_at=executed_at,
+            note=note,
+        )
+
+        if type == TransactionType.CLOSE:
+            position = self.repository.close_position(position.id, executed_at)
+
+        return {
+            "transaction_id": transaction.id,
+            "position_id": position.id,
+            "position_status": position.status,
+        }
+
+    def get_portfolio_summary(self, portfolio_id: int) -> dict[str, Any]:
+        open_positions = self.repository.get_open_positions(portfolio_id)
+        aggregates = []
+
+        for pos in open_positions:
+            transactions = self.repository.get_transactions_by_position(pos.id)
+            agg = PositionAggregate(pos, transactions)
+            aggregates.append(agg.to_dict())
+
+        total_value = sum(a["total_quantity"] * a["avg_price"] for a in aggregates)
+
+        return {
+            "portfolio_id": portfolio_id,
+            "open_positions_count": len(aggregates),
+            "total_value_at_avg_price": float(total_value),
+            "positions": aggregates,
+        }
+
+    def get_position_detail(self, position_id: int, current_price: Decimal | None = None) -> dict[str, Any]:
+        position = self.repository.get_position_with_transactions(position_id)
+        if not position:
+            raise ValueError("Position not found")
+
+        transactions = [
+            {
+                "id": t.id,
+                "type": t.type,
+                "price": float(t.price),
+                "quantity": float(t.quantity),
+                "executed_at": t.executed_at.isoformat(),
+                "note": t.note,
+            }
+            for t in position.transactions
+        ]
+
+        agg = PositionAggregate(position, position.transactions)
+        result = agg.to_dict(current_price)
+        result["transactions"] = transactions
+
+        return result

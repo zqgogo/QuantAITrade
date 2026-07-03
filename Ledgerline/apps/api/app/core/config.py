@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     trading_database_url: str = "sqlite:///./var/trading.db"
     market_database_url: str = "sqlite:///./var/market.db"
     chroma_path: str = "./var/chroma"
+    api_key: str = "dev-secret-key"
 
     model_config = SettingsConfigDict(env_prefix="LEDGERLINE_", env_file=".env")
 

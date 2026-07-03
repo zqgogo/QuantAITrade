@@ -6,7 +6,7 @@
 
 本项目已按《观澜-AI交易工作台设计文档 v0.2》的方向重新初始化。旧版 QuantAITrade 已整体移入仓库根目录的 `old/`，后续停止在旧结构上继续开发。
 
-新的主项目放在 `Ledgerline/`，当前完成的是 Phase 1 的项目骨架，不包含具体业务实现。
+新的主项目放在 `Ledgerline/`，当前已完成 Phase 1 项目骨架，并进入 Phase 2 交易记录功能的核心实现。
 
 ## 技术方案
 
@@ -24,7 +24,7 @@
 - 选型：FastAPI + Pydantic + SQLAlchemy。
 - 任务调度：APScheduler，后续驱动行情增量更新、Watch 扫描、AI Scheduled Trigger。
 - 模块边界：Trading、Market Data、Indicator、Strategy、AI Trigger、Report、Notification、News、Watch。
-- 鉴权：单用户 token 鉴权先预留，后续接入配置化密钥。
+- 鉴权：单用户 token 鉴权已实现，开发环境下跳过验证，生产环境需配置 `LEDGERLINE_API_KEY`。
 - 包管理：建议后续使用 `uv` 管理 Python 环境和锁文件，当前先保留标准 `pyproject.toml`。
 - 数据迁移：Phase 1 后半段补 Alembic；模型稳定前不手写大量迁移。
 
@@ -68,7 +68,12 @@
 ## 目录状态
 
 - `Ledgerline/apps/web`：前端框架已创建。
-- `Ledgerline/apps/api`：后端框架已创建。
+- `Ledgerline/apps/api`：后端框架已创建，Trading 模块核心功能已实现。
+  - `app/modules/trading/models.py`：完整数据模型（Workspace、Portfolio、Position、Transaction、Watchlist、Report、Notification、Note）
+  - `app/modules/trading/repository.py`：Repository 层 CRUD 操作
+  - `app/modules/trading/service.py`：Service 层业务逻辑（持仓聚合计算、交易记录）
+  - `app/modules/trading/schemas.py`：Pydantic 数据校验模型
+  - `app/modules/trading/router.py`：完整 REST API 路由
 - `Ledgerline/docs`：进度文档与架构说明已创建。
 - `old/`：旧项目归档目录。
 
@@ -76,8 +81,8 @@
 
 | Phase | 名称 | 状态 | 验收标准 |
 | --- | --- | --- | --- |
-| 1 | 项目框架 | 进行中 | FastAPI + Next.js 骨架、数据库配置、模块目录、基础健康检查 |
-| 2 | 交易记录 | 未开始 | 能记录一笔真实 Transaction，能按 Position 聚合持仓 |
+| 1 | 项目框架 | **已完成** | FastAPI + Next.js 骨架、数据库配置、模块目录、基础健康检查、鉴权中间件 |
+| 2 | 交易记录 | **进行中** | 能记录一笔真实 Transaction，能按 Position 聚合持仓 |
 | 3 | 市场数据仓库 | 未开始 | 第一个数据源接入，OHLCV 增量落库，支持手动刷新 |
 | 4 | 技术指标 | 未开始 | MA/EMA/MACD/RSI 等指标 API 可用 |
 | 5 | 策略系统 | 未开始 | 插件化策略接口和统一 Signal 输出 |
@@ -88,8 +93,38 @@
 | 10 | 回测 | 延后 | 复用 Market Data Warehouse 做策略回测 |
 | 11 | 桌面版 | 可选 | 视需要用 Tauri 打包 |
 
+## Phase 2 已实现功能
+
+### Trading 模块
+
+- **Workspace 管理**：创建、查询工作区
+- **Portfolio 管理**：创建、查询投资组合
+- **交易记录**：记录开仓/加仓/减仓/平仓操作
+  - 自动匹配或创建 Position
+  - 支持分批建仓、分批止盈
+- **持仓聚合**：实时计算持仓均价、数量
+- **持仓详情**：查看完整交易历史和持仓状态
+- **Watchlist**：添加/更新/删除关注品种及价格提醒
+- **Notification**：查看通知、标记已读
+
+### API 端点
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/trading/workspaces` | POST | 创建工作区 |
+| `/api/v1/trading/workspaces/{id}` | GET | 查询工作区 |
+| `/api/v1/trading/portfolios` | POST | 创建投资组合 |
+| `/api/v1/trading/portfolios/{id}` | GET | 查询投资组合 |
+| `/api/v1/trading/transactions` | POST | 记录交易 |
+| `/api/v1/trading/portfolios/{id}/summary` | GET | 持仓汇总 |
+| `/api/v1/trading/positions/{id}` | GET | 持仓详情 |
+| `/api/v1/trading/portfolios/{id}/watchlist` | GET | 获取关注列表 |
+| `/api/v1/trading/watchlist` | POST | 添加关注 |
+| `/api/v1/trading/watchlist/{id}` | PUT/DELETE | 更新/删除关注 |
+| `/api/v1/trading/notifications/{id}/read` | PUT | 标记已读 |
+
 ## 下一步
 
-1. 完成 Phase 1：补齐 SQLAlchemy 模型草稿、数据库初始化命令、基础鉴权中间件。
-2. 进入 Phase 2：优先实现 Workspace / Portfolio / Position / Transaction。
-3. 前端先做 Trade 快速记录和 Portfolio 汇总页，不先做大而全的 Dashboard。
+1. 运行测试验证 Phase 2 核心功能
+2. 完成 Phase 2：前端 Trade 快速记录和 Portfolio 汇总页
+3. 进入 Phase 3：市场数据仓库接入

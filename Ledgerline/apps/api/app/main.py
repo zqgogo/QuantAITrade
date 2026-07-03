@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.core.auth import verify_api_key
 from app.core.config import settings
 
 
@@ -20,7 +21,11 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.app_name}
 
-    app.include_router(api_router, prefix="/api/v1")
+    app.include_router(
+        api_router,
+        prefix="/api/v1",
+        dependencies=[Depends(verify_api_key)],
+    )
     return app
 
 

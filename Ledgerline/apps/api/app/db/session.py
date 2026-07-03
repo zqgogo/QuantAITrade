@@ -21,6 +21,8 @@ MarketSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=market
 
 def init_databases() -> None:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    from app.modules.trading import models as trading_models
+    from app.modules.market import models as market_models
     TradingBase.metadata.create_all(bind=trading_engine)
     MarketBase.metadata.create_all(bind=market_engine)
 
