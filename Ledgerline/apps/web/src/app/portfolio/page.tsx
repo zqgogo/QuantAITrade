@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, PieChart, Wallet, ArrowRight } from 'lucide-react';
 import Layout from '@/components/Layout';
@@ -68,9 +70,9 @@ function PositionChart({ positions }: { positions: PositionAggregate[] }) {
                 stroke="#334155"
                 strokeWidth="12"
               />
-              {openPositions.reduce((acc, position, index) => {
+              {openPositions.map((position, index) => {
                 const percentage = (position.total_amount / totalValue) * 100;
-                const offset = acc;
+                const offset = openPositions.slice(0, index).reduce((sum, p) => sum + (p.total_amount / totalValue) * 100, 0);
                 return (
                   <circle
                     key={position.position_id}
@@ -85,7 +87,7 @@ function PositionChart({ positions }: { positions: PositionAggregate[] }) {
                     className="transition-all duration-500"
                   />
                 );
-              }, 0)}
+              })}
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">

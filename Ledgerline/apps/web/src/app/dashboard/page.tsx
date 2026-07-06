@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Wallet, Clock, ArrowRight } from 'lucide-react';
 import Layout from '@/components/Layout';
@@ -145,11 +147,11 @@ export default function DashboardPage() {
     );
   }
 
-  const stats = [
-    { title: 'Total Balance', value: `$${(summary?.total_value || 0).toFixed(2)}`, change: '+5.2%', changeType: 'up' as const, icon: Wallet },
-    { title: 'Open Positions', value: `${summary?.positions.filter(p => p.status === 'open').length || 0}`, change: '+2', changeType: 'up' as const, icon: TrendingUp },
-    { title: 'Total PnL', value: `$${(summary?.total_pnl || 0).toFixed(2)}`, change: `${(summary?.total_pnl_percent || 0).toFixed(2)}%`, changeType: (summary?.total_pnl_percent || 0) >= 0 ? 'up' : 'down' as const, icon: TrendingUp },
-    { title: 'Last Trade', value: '-', change: '-', changeType: 'neutral' as const, icon: Clock },
+  const stats: { title: string; value: string; change: string; changeType: 'up' | 'down' | 'neutral'; icon: typeof Wallet }[] = [
+    { title: 'Total Balance', value: `$${(summary?.total_value || 0).toFixed(2)}`, change: '+5.2%', changeType: 'up', icon: Wallet },
+    { title: 'Open Positions', value: `${summary?.positions.filter(p => p.status === 'open').length || 0}`, change: '+2', changeType: 'up', icon: TrendingUp },
+    { title: 'Total PnL', value: `$${(summary?.total_pnl || 0).toFixed(2)}`, change: `${(summary?.total_pnl_percent || 0).toFixed(2)}%`, changeType: (summary?.total_pnl_percent || 0) >= 0 ? 'up' : 'down', icon: TrendingUp },
+    { title: 'Last Trade', value: '-', change: '-', changeType: 'neutral', icon: Clock },
   ];
 
   return (

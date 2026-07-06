@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { Bell, Check, AlertCircle, TrendingUp, X } from 'lucide-react';
 import Layout from '@/components/Layout';
