@@ -1,6 +1,6 @@
 # Ledgerline 项目进度
 
-更新时间：2026-07-03
+更新时间：2026-07-06
 
 ## 当前结论
 
@@ -82,7 +82,7 @@
 | Phase | 名称 | 状态 | 验收标准 |
 | --- | --- | --- | --- |
 | 1 | 项目框架 | **已完成** | FastAPI + Next.js 骨架、数据库配置、模块目录、基础健康检查、鉴权中间件 |
-| 2 | 交易记录 | **进行中** | 能记录一笔真实 Transaction，能按 Position 聚合持仓 |
+| 2 | 交易记录 | **已完成** | 能记录一笔真实 Transaction，能按 Position 聚合持仓，前端 Trade/Portfolio 页面可用 |
 | 3 | 市场数据仓库 | 未开始 | 第一个数据源接入，OHLCV 增量落库，支持手动刷新 |
 | 4 | 技术指标 | 未开始 | MA/EMA/MACD/RSI 等指标 API 可用 |
 | 5 | 策略系统 | 未开始 | 插件化策略接口和统一 Signal 输出 |
@@ -123,8 +123,35 @@
 | `/api/v1/trading/watchlist/{id}` | PUT/DELETE | 更新/删除关注 |
 | `/api/v1/trading/notifications/{id}/read` | PUT | 标记已读 |
 
+## Phase 2 前端实现
+
+### 页面结构
+
+| 页面 | 路径 | 功能 |
+| --- | --- | --- |
+| Dashboard | `/dashboard` | 仪表盘概览、统计卡片、持仓摘要、最近交易 |
+| Trade | `/trade` | 快速记录交易表单、交易历史列表 |
+| Portfolio | `/portfolio` | 持仓汇总、资产配置饼图、持仓详情 |
+| Notifications | `/notifications` | 通知列表、标记已读 |
+| Reports | `/reports` | 报表生成入口 |
+| Settings | `/settings` | 通知设置、外观设置、安全设置 |
+
+### 前端技术栈
+
+- **框架**: Next.js 16 + React 19
+- **样式**: Tailwind CSS 3.4
+- **图标**: Lucide React
+- **HTTP 客户端**: Axios
+- **布局**: 侧边栏导航 + 主内容区
+
+### 核心组件
+
+- `Sidebar.tsx`: 侧边栏导航
+- `Layout.tsx`: 全局布局
+- `lib/api.ts`: API 客户端和类型定义
+
 ## 下一步
 
-1. 运行测试验证 Phase 2 核心功能
-2. 完成 Phase 2：前端 Trade 快速记录和 Portfolio 汇总页
-3. 进入 Phase 3：市场数据仓库接入
+1. 进入 Phase 3：市场数据仓库接入
+2. 接入 ccxt 数据源，实现 OHLCV 增量落库
+3. 实现手动刷新 API
