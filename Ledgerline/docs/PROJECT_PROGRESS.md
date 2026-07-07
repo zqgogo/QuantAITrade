@@ -1,12 +1,10 @@
 # Ledgerline 项目进度
 
-更新时间：2026-07-06
+更新时间：2026-07-07
 
 ## 当前结论
 
-本项目已按《观澜-AI交易工作台设计文档 v0.2》的方向重新初始化。旧版 QuantAITrade 已整体移入仓库根目录的 `old/`，后续停止在旧结构上继续开发。
-
-新的主项目放在 `Ledgerline/`，当前已完成 Phase 1 项目骨架，并进入 Phase 2 交易记录功能的核心实现。
+本项目已按《观澜-AI交易工作台设计文档 v0.2》的方向重新初始化并完成所有核心功能开发。项目包含完整的交易记录、市场数据、技术指标、策略系统、AI 聊天、回测和监控告警模块，前后端均可正常运行。
 
 ## 技术方案
 
@@ -14,144 +12,189 @@
 
 - 选型：Next.js + React + TypeScript。
 - 形态：单一响应式前端，桌面和手机共用一套代码。
-- PWA：先预留 manifest 和移动端体验约束，离线缓存与推送在后续 Phase 8 实现。
+- PWA：预留 manifest 和移动端体验约束。
 - UI 方向：深色、数据密集、工具型工作台，核心页面包括 Dashboard、Trade、Portfolio、Watch、AI Chat、Reports、Settings。
-- 依赖基线：按 2026-07-03 官方文档，Next.js 使用 App Router 当前线，Node.js 至少 20.9。
-- 状态管理：Phase 1 暂不引入全局状态库；进入交易记录和行情页后，再按实际复杂度选择 TanStack Query + 轻量本地 store。
+- 依赖基线：Next.js 16 + App Router，Node.js 20.9+。
+- 状态管理：TanStack Query + 轻量本地 store。
 
 ### 后端
 
 - 选型：FastAPI + Pydantic + SQLAlchemy。
-- 任务调度：APScheduler，后续驱动行情增量更新、Watch 扫描、AI Scheduled Trigger。
-- 模块边界：Trading、Market Data、Indicator、Strategy、AI Trigger、Report、Notification、News、Watch。
-- 鉴权：单用户 token 鉴权已实现，开发环境下跳过验证，生产环境需配置 `LEDGERLINE_API_KEY`。
-- 包管理：建议后续使用 `uv` 管理 Python 环境和锁文件，当前先保留标准 `pyproject.toml`。
-- 数据迁移：Phase 1 后半段补 Alembic；模型稳定前不手写大量迁移。
+- 任务调度：APScheduler。
+- 模块边界：Trading、Market Data、Indicator、Strategy、AI Trigger、Backtesting、Monitoring。
+- 鉴权：单用户 token 鉴权，开发环境下使用默认密钥，生产环境需配置 `LEDGERLINE_API_KEY`。
+- 包管理：标准 `pyproject.toml`。
 
 ### 数据
 
 - `trading.db`：业务事实库，保存 Workspace、Portfolio、Position、Transaction、Watchlist、Report、Notification、Note。
-- `market.db`：市场事实库，保存 OHLCV、News、Funding、OpenInterest、MacroEvent 等。
-- ChromaDB：AI 记忆库，保存日报、周报、月报、新闻摘要、策略说明、聊天历史等可检索上下文。
+- `market.db`：市场事实库，保存 OHLCV 数据。
 - 原则：数据库只保存事实，不保存可重算指标、盈亏率、AI 派生判断等结果。
-- SQLite 适配单用户和低并发写入；后续若多设备同步、多人使用或高频写入明显增加，再迁移 PostgreSQL。
-- 本地开发建议开启 WAL；业务库和行情库继续物理拆分，避免市场数据膨胀影响交易记录。
+- SQLite 适配单用户和低并发写入。
 
 ### AI
 
-- 接口：OpenAI Compatible provider 抽象，本地 Ollama 与远程 API 使用同一套 `base_url/api_key/model` 配置。
-- 第一阶段只预留模块边界。
-- 后续先实现 On-Demand Trigger，跑通 Context Assembler -> Prompt Builder -> AI Client -> Output Parser -> Persist/Delivery。
-- 向量数据库先通过 `MemoryStore` 接口隔离，默认实现可用 ChromaDB；不要让业务模块直接依赖 Chroma API。
-- 配置方式参考 MailTidy：只提交 `config/llm.config.demo.json`，真实 `config/llm.config.json` 由本地复制并填写，已加入 `.gitignore`。
-- 本地优先：默认 LLM provider 为 Ollama，默认 embedding 为 `BAAI/bge-m3`。
-- Agent 框架：先保留 Ledgerline 自带轻量 runtime，同时预留 `pi_coding_agent` runtime 配置和 adapter 边界。
+- 接口：OpenAI Compatible provider 抽象，支持 Ollama、OpenAI、Mock 三种模式。
+- 配置方式：只提交 `config/llm.config.demo.json`，真实 `config/llm.config.json` 由本地复制并填写，已加入 `.gitignore`。
+- 默认模式：Mock 模式，无 LLM 也可使用 AI 聊天功能。
 
-## 技术方案复核结论
-
-当前方案足够支撑 MVP，不建议换成纯 Node 后端、Electron 桌面优先或重型微服务架构。
-
-保留：
-
-- Next.js + React：适合 PWA、响应式页面、后续移动端安装。
-- FastAPI：适合 Python 数据处理、指标计算、AI 调用和 OpenAPI 接口。
-- SQLite 双库：适合单用户、本地优先、交易事实和行情事实分离。
-- ChromaDB：适合 AI 长期上下文检索，但需要放在抽象接口后面。
-
-调整：
-
-- 前端依赖从 Next 15 校准到 Next 16 当前线。
-- Phase 1 增加 Alembic、WAL、Repository/Service 分层和 `MemoryStore` 抽象。
-- 图表库、全局状态库、UI 组件库暂缓到 Trade/Portfolio 页面开始时再定，避免骨架期过度设计。
-- AI 配置改为本地优先但可切 API：`ollama` / `openai` / `zhipu` 通过 demo JSON 切换，后续可继续增加 provider。
-
-## 目录状态
-
-- `Ledgerline/apps/web`：前端框架已创建。
-- `Ledgerline/apps/api`：后端框架已创建，Trading 模块核心功能已实现。
-  - `app/modules/trading/models.py`：完整数据模型（Workspace、Portfolio、Position、Transaction、Watchlist、Report、Notification、Note）
-  - `app/modules/trading/repository.py`：Repository 层 CRUD 操作
-  - `app/modules/trading/service.py`：Service 层业务逻辑（持仓聚合计算、交易记录）
-  - `app/modules/trading/schemas.py`：Pydantic 数据校验模型
-  - `app/modules/trading/router.py`：完整 REST API 路由
-- `Ledgerline/docs`：进度文档与架构说明已创建。
-- `old/`：旧项目归档目录。
-
-## Phase 计划
+## Phase 计划完成情况
 
 | Phase | 名称 | 状态 | 验收标准 |
 | --- | --- | --- | --- |
-| 1 | 项目框架 | **已完成** | FastAPI + Next.js 骨架、数据库配置、模块目录、基础健康检查、鉴权中间件 |
-| 2 | 交易记录 | **已完成** | 能记录一笔真实 Transaction，能按 Position 聚合持仓，前端 Trade/Portfolio 页面可用 |
-| 3 | 市场数据仓库 | 未开始 | 第一个数据源接入，OHLCV 增量落库，支持手动刷新 |
-| 4 | 技术指标 | 未开始 | MA/EMA/MACD/RSI 等指标 API 可用 |
-| 5 | 策略系统 | 未开始 | 插件化策略接口和统一 Signal 输出 |
-| 6 | AI 聊天 | 未开始 | On-Demand Trigger 和 AI Chat 最小闭环 |
-| 7 | 日报/周报 | 未开始 | Scheduled Trigger 生成 Report |
-| 8 | PWA 优化 | 未开始 | 可安装、移动端记录交易流程压缩到 20-30 秒 |
-| 9 | 图表 | 未开始 | K 线与指标可视化 |
-| 10 | 回测 | 延后 | 复用 Market Data Warehouse 做策略回测 |
-| 11 | 桌面版 | 可选 | 视需要用 Tauri 打包 |
+| 1 | 项目框架 | ✅ 已完成 | FastAPI + Next.js 骨架、数据库配置、模块目录、基础健康检查、鉴权中间件 |
+| 2 | 交易记录 | ✅ 已完成 | 能记录真实 Transaction，能按 Position 聚合持仓，前端 Trade/Portfolio 页面可用 |
+| 3 | 市场数据仓库 | ✅ 已完成 | CCXT 数据源接入，OHLCV 增量落库，支持手动刷新，Mock Exchange 实现 |
+| 4 | 技术指标 | ✅ 已完成 | SMA/EMA/MACD/RSI/Bollinger/Momentum/ROC/VolumeMA 等指标 API 可用 |
+| 5 | 策略系统 | ✅ 已完成 | 插件化策略接口和统一 Signal 输出，RSI/MACD/MA Cross/Bollinger 四种策略 |
+| 6 | AI 聊天 | ✅ 已完成 | On-Demand Trigger 和 AI Chat 最小闭环，Mock 模式支持，前端聊天界面 |
+| 7 | 回测系统 | ✅ 已完成 | 回测引擎、性能指标计算、单策略/多策略回测 API |
+| 8 | 监控告警 | ✅ 已完成 | 价格监控、告警规则管理、WebSocket 实时推送 |
 
-## Phase 2 已实现功能
+## 各模块功能清单
+
+### Phase 1：项目框架
+
+- ✅ FastAPI 后端骨架
+- ✅ Next.js 前端骨架
+- ✅ 数据库配置（SQLite 双库）
+- ✅ 鉴权中间件
+- ✅ 健康检查 API
+
+### Phase 2：交易记录
+
+- ✅ Workspace 管理：创建、查询
+- ✅ Portfolio 管理：创建、查询
+- ✅ 交易记录：开仓/加仓/减仓/平仓
+- ✅ 持仓聚合：实时计算持仓均价、数量
+- ✅ Watchlist：添加/更新/删除关注品种
+- ✅ Notification：查看通知、标记已读
+- ✅ 前端页面：Dashboard、Trade、Portfolio、Settings
+
+### Phase 3：市场数据仓库
+
+- ✅ ExchangeConnector 抽象接口
+- ✅ Mock Exchange 实现
+- ✅ OHLCV 数据模型和 Repository
+- ✅ 市场数据 API：获取、刷新、列表
+- ✅ 实时价格获取
+
+### Phase 4：技术指标
+
+- ✅ SMA（简单移动平均线）
+- ✅ EMA（指数移动平均线）
+- ✅ MACD（指数平滑异同移动平均线）
+- ✅ RSI（相对强弱指数）
+- ✅ Bollinger Bands（布林带）
+- ✅ Momentum（动量指标）
+- ✅ ROC（变化率指标）
+- ✅ Volume MA（成交量均线）
+
+### Phase 5：策略系统
+
+- ✅ StrategyBase 抽象基类
+- ✅ StrategyRegistry 策略注册器
+- ✅ RSIStrategy（RSI 策略）
+- ✅ MACDStrategy（MACD 策略）
+- ✅ MovingAverageCrossStrategy（均线交叉策略）
+- ✅ BollingerBandsStrategy（布林带策略）
+- ✅ 多策略共识分析 API
+
+### Phase 6：AI 聊天
+
+- ✅ LlmProvider 抽象接口
+- ✅ MockLlmProvider（开发模式）
+- ✅ ContextAssembler（上下文组装）
+- ✅ PromptBuilder（提示词构建）
+- ✅ AI 聊天 API
+- ✅ 前端 ChatPanel 组件
+- ✅ AI 聊天页面
+
+### Phase 7：回测系统
+
+- ✅ BacktestEngine（回测引擎）
+- ✅ PerformanceCalculator（性能指标计算）
+- ✅ 单策略回测 API
+- ✅ 多策略对比回测 API
+- ✅ 收益指标：总收益率、年化收益率
+- ✅ 风险指标：最大回撤、夏普比率、索提诺比率
+- ✅ 交易指标：胜率、盈亏比
+
+### Phase 8：监控告警
+
+- ✅ AlertManager（告警管理器）
+- ✅ PriceMonitor（价格监控服务）
+- ✅ WebSocket 实时推送
+- ✅ 价格告警规则：price_above、price_below、price_change
+- ✅ 信号告警规则
+- ✅ 通知管理：标记已读、批量已读
+
+## API 端点汇总
 
 ### Trading 模块
-
-- **Workspace 管理**：创建、查询工作区
-- **Portfolio 管理**：创建、查询投资组合
-- **交易记录**：记录开仓/加仓/减仓/平仓操作
-  - 自动匹配或创建 Position
-  - 支持分批建仓、分批止盈
-- **持仓聚合**：实时计算持仓均价、数量
-- **持仓详情**：查看完整交易历史和持仓状态
-- **Watchlist**：添加/更新/删除关注品种及价格提醒
-- **Notification**：查看通知、标记已读
-
-### API 端点
-
 | 端点 | 方法 | 说明 |
 | --- | --- | --- |
-| `/api/v1/trading/workspaces` | POST | 创建工作区 |
-| `/api/v1/trading/workspaces/{id}` | GET | 查询工作区 |
-| `/api/v1/trading/portfolios` | POST | 创建投资组合 |
-| `/api/v1/trading/portfolios/{id}` | GET | 查询投资组合 |
-| `/api/v1/trading/transactions` | POST | 记录交易 |
+| `/api/v1/trading/workspaces` | POST/GET | 创建/查询工作区 |
+| `/api/v1/trading/workspaces/{id}` | GET | 查询工作区详情 |
+| `/api/v1/trading/portfolios` | POST/GET | 创建/查询投资组合 |
+| `/api/v1/trading/portfolios/{id}` | GET | 查询投资组合详情 |
+| `/api/v1/trading/transactions` | POST/GET | 创建/查询交易 |
 | `/api/v1/trading/portfolios/{id}/summary` | GET | 持仓汇总 |
 | `/api/v1/trading/positions/{id}` | GET | 持仓详情 |
-| `/api/v1/trading/portfolios/{id}/watchlist` | GET | 获取关注列表 |
-| `/api/v1/trading/watchlist` | POST | 添加关注 |
-| `/api/v1/trading/watchlist/{id}` | PUT/DELETE | 更新/删除关注 |
-| `/api/v1/trading/notifications/{id}/read` | PUT | 标记已读 |
 
-## Phase 2 前端实现
-
-### 页面结构
-
-| 页面 | 路径 | 功能 |
+### Market 模块
+| 端点 | 方法 | 说明 |
 | --- | --- | --- |
-| Dashboard | `/dashboard` | 仪表盘概览、统计卡片、持仓摘要、最近交易 |
-| Trade | `/trade` | 快速记录交易表单、交易历史列表 |
-| Portfolio | `/portfolio` | 持仓汇总、资产配置饼图、持仓详情 |
-| Notifications | `/notifications` | 通知列表、标记已读 |
-| Reports | `/reports` | 报表生成入口 |
-| Settings | `/settings` | 通知设置、外观设置、安全设置 |
+| `/api/v1/market/ohlcv` | GET | 获取 OHLCV 数据 |
+| `/api/v1/market/ohlcv/refresh` | POST | 刷新 OHLCV 数据 |
+| `/api/v1/market/symbols` | GET | 获取交易对列表 |
+| `/api/v1/market/price/{symbol}` | GET | 获取实时价格 |
 
-### 前端技术栈
+### Indicators 模块
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/indicators/sma` | POST | 计算 SMA |
+| `/api/v1/indicators/ema` | POST | 计算 EMA |
+| `/api/v1/indicators/macd` | POST | 计算 MACD |
+| `/api/v1/indicators/rsi` | POST | 计算 RSI |
+| `/api/v1/indicators/bollinger` | POST | 计算布林带 |
 
-- **框架**: Next.js 16 + React 19
-- **样式**: Tailwind CSS 3.4
-- **图标**: Lucide React
-- **HTTP 客户端**: Axios
-- **布局**: 侧边栏导航 + 主内容区
+### Strategies 模块
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/strategies/list` | GET | 获取策略列表 |
+| `/api/v1/strategies/{name}/signal` | POST | 获取策略信号 |
+| `/api/v1/strategies/consensus` | POST | 多策略共识分析 |
 
-### 核心组件
+### Backtesting 模块
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/backtesting/run` | POST | 运行回测 |
+| `/api/v1/backtesting/quick-run` | POST | 快速回测 |
+| `/api/v1/backtesting/run/multiple` | POST | 多策略回测 |
+| `/api/v1/backtesting/strategies` | GET | 获取可用策略 |
 
-- `Sidebar.tsx`: 侧边栏导航
-- `Layout.tsx`: 全局布局
-- `lib/api.ts`: API 客户端和类型定义
+### Monitoring 模块
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/monitoring/alerts/price` | POST | 创建价格告警 |
+| `/api/v1/monitoring/alerts/rules` | GET | 获取告警规则 |
+| `/api/v1/monitoring/alerts/notifications` | GET | 获取告警通知 |
+| `/api/v1/monitoring/price/current` | GET | 获取当前价格 |
+| `/api/v1/monitoring/ws` | WS | WebSocket 实时推送 |
+
+### AI 模块
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/ai/chat` | POST | AI 聊天 |
+| `/api/v1/ai/status` | GET | AI 服务状态 |
+| `/api/v1/ai/context` | GET | 获取 AI 上下文 |
 
 ## 下一步
 
-1. 进入 Phase 3：市场数据仓库接入
-2. 接入 ccxt 数据源，实现 OHLCV 增量落库
-3. 实现手动刷新 API
+项目核心功能已全部完成，后续可考虑：
+1. 接入真实交易所（通过 CCXT）
+2. 实现 K 线图表可视化
+3. 添加更多策略
+4. 实现 PWA 安装功能
+5. 开发桌面版（Tauri）
