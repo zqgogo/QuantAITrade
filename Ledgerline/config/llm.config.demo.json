@@ -1,5 +1,20 @@
 {
   "providers": {
+    "mock": {
+      "name": "mock",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "mock",
+      "api_mode": "chat_completions",
+      "models": [
+        {
+          "id": "mock",
+          "name": "Mock Provider"
+        }
+      ],
+      "default_model": "mock",
+      "temperature": 0.2,
+      "max_tokens": 1200
+    },
     "ollama": {
       "name": "ollama_local",
       "base_url": "http://localhost:11434/v1",
@@ -58,7 +73,7 @@
       "max_tokens": 1200
     }
   },
-  "active_provider": "ollama",
+  "active_provider": "mock",
   "embedding": {
     "provider": "local",
     "model": "BAAI/bge-m3",

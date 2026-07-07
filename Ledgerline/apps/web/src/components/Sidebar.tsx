@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, TrendingUp, Wallet, Bell, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Wallet, Bell, FileText, Settings, Bot } from 'lucide-react';
 
 interface SidebarProps {
   currentPage: string;
@@ -7,6 +7,7 @@ interface SidebarProps {
 
 const navItems = [
   { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
+  { id: 'chat', label: 'AI 聊天', icon: Bot },
   { id: 'trade', label: '交易记录', icon: TrendingUp },
   { id: 'portfolio', label: '持仓汇总', icon: Wallet },
   { id: 'notifications', label: '通知', icon: Bell },

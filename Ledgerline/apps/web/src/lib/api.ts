@@ -103,6 +103,37 @@ export interface Notification {
   created_at: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  workspace_id?: number;
+  include_context?: boolean;
+  model?: string;
+}
+
+export interface ChatResponse {
+  content: string;
+  timestamp: string;
+  model: string;
+  runtime: string;
+  context_used: boolean;
+}
+
+export interface AiStatusResponse {
+  module: string;
+  status: string;
+  llm_provider: string;
+  embedding_provider: string;
+  embedding_model: string;
+  agent_runtime: string;
+  available_models: string[];
+}
+
 export interface TradeRecordRequest {
   portfolio_id: number;
   market: string;
@@ -113,6 +144,15 @@ export interface TradeRecordRequest {
   price: number;
   fee?: number;
 }
+
+export const aiApi = {
+  status: () => api.get<AiStatusResponse>('/ai/status'),
+  chat: (data: ChatRequest) => api.post<ChatResponse>('/ai/chat', data),
+  chatSignal: (params: { strategy: string; symbol: string; market: string; interval: string }) => 
+    api.post<ChatResponse>('/ai/chat/signal', null, { params }),
+  chatPortfolio: () => api.post<ChatResponse>('/ai/chat/portfolio'),
+  context: () => api.get<any>('/ai/context'),
+};
 
 export const tradingApi = {
   workspaces: {
