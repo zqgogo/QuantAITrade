@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, PieChart, Wallet, ArrowRight } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { tradingApi, PortfolioSummary, PositionAggregate } from '@/lib/api';
+import { formatCurrency, Currency } from '@/lib/currency';
 
-function PortfolioHeader({ summary }: { summary: PortfolioSummary }) {
+function PortfolioHeader({ summary, currency }: { summary: PortfolioSummary; currency: Currency }) {
   const isProfit = summary.total_pnl_percent >= 0;
 
   return (
@@ -13,10 +14,10 @@ function PortfolioHeader({ summary }: { summary: PortfolioSummary }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-primary-400 mb-1">{summary.portfolio_name}</p>
-          <h2 className="text-3xl font-bold text-white">${summary.total_value.toFixed(2)}</h2>
+          <h2 className="text-3xl font-bold text-white">{formatCurrency(summary.total_value, currency)}</h2>
           <div className="flex items-center gap-2 mt-2">
             <span className={`text-lg font-medium ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-              {isProfit ? '+' : ''}${summary.total_pnl.toFixed(2)}
+              {isProfit ? '+' : ''}{formatCurrency(summary.total_pnl, currency)}
             </span>
             <span className={`text-sm ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
               ({isProfit ? '+' : ''}{summary.total_pnl_percent.toFixed(2)}%)
@@ -43,7 +44,7 @@ function PortfolioHeader({ summary }: { summary: PortfolioSummary }) {
   );
 }
 
-function PositionChart({ positions }: { positions: PositionAggregate[] }) {
+function PositionChart({ positions, currency }: { positions: PositionAggregate[]; currency: Currency }) {
   const openPositions = positions.filter(p => p.status === 'open');
   const totalValue = openPositions.reduce((sum, p) => sum + p.total_amount, 0);
 
@@ -91,7 +92,7 @@ function PositionChart({ positions }: { positions: PositionAggregate[] }) {
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <p className="text-lg font-bold text-white">${totalValue.toFixed(0)}</p>
+                <p className="text-lg font-bold text-white">{formatCurrency(totalValue, currency)}</p>
                 <p className="text-xs text-dark-600">Total</p>
               </div>
             </div>
@@ -105,7 +106,7 @@ function PositionChart({ positions }: { positions: PositionAggregate[] }) {
                   {((position.total_amount / totalValue) * 100).toFixed(1)}%
                 </span>
                 <span className="text-sm font-medium text-white">
-                  ${position.total_amount.toFixed(0)}
+                  {formatCurrency(position.total_amount, currency)}
                 </span>
               </div>
             ))}
@@ -121,7 +122,7 @@ function PositionChart({ positions }: { positions: PositionAggregate[] }) {
   );
 }
 
-function PositionDetail({ position }: { position: PositionAggregate }) {
+function PositionDetail({ position, currency }: { position: PositionAggregate; currency: Currency }) {
   const isProfit = position.pnl_percent !== null && position.pnl_percent >= 0;
 
   return (
@@ -153,7 +154,7 @@ function PositionDetail({ position }: { position: PositionAggregate }) {
         </div>
         <div className={`text-right ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
           <p className="text-xl font-bold">
-            {isProfit ? '+' : ''}${(position.pnl || 0).toFixed(2)}
+            {isProfit ? '+' : ''}{formatCurrency(position.pnl || 0, currency)}
           </p>
           <p className="text-sm">
             ({isProfit ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%)
@@ -168,15 +169,15 @@ function PositionDetail({ position }: { position: PositionAggregate }) {
         </div>
         <div>
           <p className="text-xs text-dark-600">Avg Price</p>
-          <p className="text-white font-medium">${position.avg_price.toFixed(2)}</p>
+          <p className="text-white font-medium">{formatCurrency(position.avg_price, currency)}</p>
         </div>
         <div>
           <p className="text-xs text-dark-600">Total Value</p>
-          <p className="text-white font-medium">${position.total_amount.toFixed(2)}</p>
+          <p className="text-white font-medium">{formatCurrency(position.total_amount, currency)}</p>
         </div>
         <div>
           <p className="text-xs text-dark-600">Total Fees</p>
-          <p className="text-dark-600 font-medium">${position.total_fee.toFixed(2)}</p>
+          <p className="text-dark-600 font-medium">{formatCurrency(position.total_fee, currency)}</p>
         </div>
       </div>
 
@@ -197,21 +198,26 @@ function PositionDetail({ position }: { position: PositionAggregate }) {
 
 export default function PortfolioPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [currency, setCurrency] = useState<Currency>('USD');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchSummary() {
+    async function fetchData() {
       setLoading(true);
       try {
-        const res = await tradingApi.portfolios.summary(1);
-        setSummary(res.data);
+        const [summaryRes, portfolioRes] = await Promise.all([
+          tradingApi.portfolios.summary(1),
+          tradingApi.portfolios.get(1),
+        ]);
+        setSummary(summaryRes.data);
+        setCurrency((portfolioRes.data.currency || 'USD') as Currency);
       } catch (error) {
-        console.error('Failed to fetch portfolio summary:', error);
+        console.error('Failed to fetch portfolio data:', error);
       } finally {
         setLoading(false);
       }
     }
-    fetchSummary();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -257,14 +263,14 @@ export default function PortfolioPage() {
         </div>
 
         <div className="space-y-6">
-          <PortfolioHeader summary={summary} />
-          <PositionChart positions={summary.positions} />
+          <PortfolioHeader summary={summary} currency={currency} />
+          <PositionChart positions={summary.positions} currency={currency} />
           
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Position Details</h3>
             <div className="grid grid-cols-2 gap-6">
               {summary.positions.map((position) => (
-                <PositionDetail key={position.position_id} position={position} />
+                <PositionDetail key={position.position_id} position={position} currency={currency} />
               ))}
             </div>
             {summary.positions.length === 0 && (

@@ -59,6 +59,7 @@ class Portfolio(TradingBase):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
     name: Mapped[str] = mapped_column(String(80), index=True)
+    currency: Mapped[str] = mapped_column(String(3), default="USD")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     workspace: Mapped[Workspace] = relationship(back_populates="portfolios")
@@ -90,6 +91,7 @@ class Transaction(TradingBase):
     type: Mapped[TransactionType] = mapped_column(String(10))
     price: Mapped[Decimal] = mapped_column(Numeric(24, 10))
     quantity: Mapped[Decimal] = mapped_column(Numeric(24, 10))
+    fee: Mapped[Decimal] = mapped_column(Numeric(24, 10), default=Decimal(0))
     executed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -43,8 +43,8 @@ class TradingRepository:
     def get_portfolios_by_workspace(self, workspace_id: int) -> Sequence[Portfolio]:
         return self.db.scalars(select(Portfolio).where(Portfolio.workspace_id == workspace_id)).all()
 
-    def create_portfolio(self, workspace_id: int, name: str) -> Portfolio:
-        portfolio = Portfolio(workspace_id=workspace_id, name=name)
+    def create_portfolio(self, workspace_id: int, name: str, currency: str = "USD") -> Portfolio:
+        portfolio = Portfolio(workspace_id=workspace_id, name=name, currency=currency)
         self.db.add(portfolio)
         self.db.commit()
         self.db.refresh(portfolio)
@@ -111,6 +111,7 @@ class TradingRepository:
         price: Decimal,
         quantity: Decimal,
         executed_at: datetime,
+        fee: Decimal = Decimal(0),
         note: str | None = None,
     ) -> Transaction:
         transaction = Transaction(
@@ -118,6 +119,7 @@ class TradingRepository:
             type=type,
             price=price,
             quantity=quantity,
+            fee=fee,
             executed_at=executed_at,
             note=note,
         )

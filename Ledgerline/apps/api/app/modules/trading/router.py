@@ -50,11 +50,12 @@ async def get_workspace(workspace_id: int):
 
 @router.post("/portfolios", response_model=PortfolioResponse)
 async def create_portfolio(data: PortfolioCreate):
-    portfolio = repository.create_portfolio(data.workspace_id, data.name)
+    portfolio = repository.create_portfolio(data.workspace_id, data.name, data.currency)
     return {
         "id": portfolio.id,
         "workspace_id": portfolio.workspace_id,
         "name": portfolio.name,
+        "currency": portfolio.currency,
         "created_at": portfolio.created_at.isoformat(),
     }
 
@@ -68,6 +69,7 @@ async def get_portfolio(portfolio_id: int):
         "id": portfolio.id,
         "workspace_id": portfolio.workspace_id,
         "name": portfolio.name,
+        "currency": portfolio.currency,
         "created_at": portfolio.created_at.isoformat(),
     }
 
@@ -87,6 +89,7 @@ async def record_transaction(data: TransactionCreate):
         type=transaction_type,
         price=Decimal(str(data.price)),
         quantity=Decimal(str(data.quantity)),
+        fee=Decimal(str(data.fee)),
         executed_at=data.executed_at,
         note=data.note,
     )

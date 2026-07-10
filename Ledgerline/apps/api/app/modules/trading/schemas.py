@@ -8,11 +8,12 @@ class TransactionCreate(BaseModel):
     portfolio_id: int = Field(description="Portfolio ID")
     market: str = Field(description="Market type (e.g., crypto, stock, future)")
     symbol: str = Field(description="Trading symbol (e.g., BTCUSDT)")
-    side: str = Field(description="Position side (long/short)")
+    side: str = Field(description="Position side (buy/sell)")
     type: str = Field(description="Transaction type (open/add/reduce/close)")
     price: float = Field(description="Execution price")
     quantity: float = Field(description="Quantity traded")
-    executed_at: datetime = Field(description="Execution timestamp")
+    fee: float = Field(default=0, description="Transaction fee")
+    executed_at: datetime | None = Field(default=None, description="Execution timestamp")
     note: str | None = Field(default=None, description="Optional note")
 
 
@@ -42,15 +43,19 @@ class PositionSummary(BaseModel):
     closed_at: str | None
     total_quantity: float
     avg_price: float
+    total_amount: float
+    total_fee: float
     current_price: float | None = None
     pnl: float | None = None
-    pnl_pct: float | None = None
+    pnl_percent: float | None = None
 
 
 class PortfolioSummaryResponse(BaseModel):
     portfolio_id: int
-    open_positions_count: int
-    total_value_at_avg_price: float
+    portfolio_name: str
+    total_value: float
+    total_pnl: float
+    total_pnl_percent: float
     positions: list[PositionSummary]
 
 
@@ -61,12 +66,14 @@ class PositionDetailResponse(PositionSummary):
 class PortfolioCreate(BaseModel):
     workspace_id: int = Field(description="Workspace ID")
     name: str = Field(description="Portfolio name")
+    currency: str = Field(default="USD", description="Base currency (USD/CNY)")
 
 
 class PortfolioResponse(BaseModel):
     id: int
     workspace_id: int
     name: str
+    currency: str
     created_at: str
 
 

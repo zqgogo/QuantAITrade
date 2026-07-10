@@ -86,9 +86,12 @@ class TradingService:
         type: TransactionType,
         price: Decimal,
         quantity: Decimal,
-        executed_at: datetime,
+        executed_at: datetime | None = None,
+        fee: Decimal = Decimal(0),
         note: str | None = None,
     ) -> dict[str, Any]:
+        if executed_at is None:
+            executed_at = datetime.utcnow()
         open_positions = self.repository.get_open_positions(portfolio_id)
         position = None
 
@@ -114,6 +117,7 @@ class TradingService:
             type=type,
             price=price,
             quantity=quantity,
+            fee=fee,
             executed_at=executed_at,
             note=note,
         )
@@ -122,26 +126,43 @@ class TradingService:
             position = self.repository.close_position(position.id, executed_at)
 
         return {
-            "transaction_id": transaction.id,
+            "id": transaction.id,
+            "portfolio_id": position.portfolio_id,
             "position_id": position.id,
-            "position_status": position.status,
+            "market": position.market,
+            "symbol": position.symbol,
+            "side": position.side,
+            "type": transaction.type,
+            "quantity": float(transaction.quantity),
+            "price": float(transaction.price),
+            "amount": float(transaction.price * transaction.quantity),
+            "fee": float(transaction.fee),
+            "created_at": transaction.created_at.isoformat(),
         }
 
     def get_portfolio_summary(self, portfolio_id: int) -> dict[str, Any]:
+        portfolio = self.repository.get_portfolio(portfolio_id)
         open_positions = self.repository.get_open_positions(portfolio_id)
         aggregates = []
 
         for pos in open_positions:
             transactions = self.repository.get_transactions_by_position(pos.id)
             agg = PositionAggregate(pos, transactions)
-            aggregates.append(agg.to_dict())
+            agg_dict = agg.to_dict()
+            agg_dict["total_amount"] = float(agg.total_quantity * agg.avg_price)
+            agg_dict["total_fee"] = 0
+            agg_dict["pnl"] = None
+            agg_dict["pnl_percent"] = None
+            aggregates.append(agg_dict)
 
-        total_value = sum(a["total_quantity"] * a["avg_price"] for a in aggregates)
+        total_value = sum(a["total_amount"] for a in aggregates)
 
         return {
             "portfolio_id": portfolio_id,
-            "open_positions_count": len(aggregates),
-            "total_value_at_avg_price": float(total_value),
+            "portfolio_name": portfolio.name if portfolio else "",
+            "total_value": float(total_value),
+            "total_pnl": 0,
+            "total_pnl_percent": 0,
             "positions": aggregates,
         }
 

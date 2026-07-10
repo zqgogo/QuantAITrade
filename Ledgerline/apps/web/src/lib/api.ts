@@ -29,6 +29,7 @@ export interface Portfolio {
   id: number;
   workspace_id: number;
   name: string;
+  currency: string;
   description: string;
   created_at: string;
 }

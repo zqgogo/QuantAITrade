@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Wallet, Clock, ArrowRight } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { tradingApi, PortfolioSummary, PositionAggregate, Transaction } from '@/lib/api';
+import { formatCurrency, Currency } from '@/lib/currency';
 
 function StatCard({ title, value, change, changeType, icon: Icon }: { 
   title: string; 
@@ -43,7 +44,7 @@ function StatCard({ title, value, change, changeType, icon: Icon }: {
   );
 }
 
-function PositionCard({ position }: { position: PositionAggregate }) {
+function PositionCard({ position, currency }: { position: PositionAggregate; currency: Currency }) {
   const isProfit = position.pnl_percent !== null && position.pnl_percent >= 0;
   return (
     <div className="bg-dark-800 rounded-lg p-4 border border-dark-700 hover:border-dark-600 transition-colors">
@@ -65,12 +66,12 @@ function PositionCard({ position }: { position: PositionAggregate }) {
         </div>
         <div>
           <p className="text-dark-600 text-xs">Avg Price</p>
-          <p className="text-white font-medium">${position.avg_price.toFixed(2)}</p>
+          <p className="text-white font-medium">{formatCurrency(position.avg_price, currency)}</p>
         </div>
         <div>
           <p className="text-dark-600 text-xs">PnL</p>
           <p className={`font-medium ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-            {isProfit ? '+' : ''}${(position.pnl || 0).toFixed(2)} ({isProfit ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%)
+            {isProfit ? '+' : ''}{formatCurrency(position.pnl || 0, currency)} ({isProfit ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%)
           </p>
         </div>
       </div>
@@ -106,17 +107,20 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
 export default function DashboardPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [currency, setCurrency] = useState<Currency>('USD');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [summaryRes, transactionsRes] = await Promise.all([
+        const [summaryRes, transactionsRes, portfolioRes] = await Promise.all([
           tradingApi.portfolios.summary(1),
           tradingApi.transactions.list(),
+          tradingApi.portfolios.get(1),
         ]);
         setSummary(summaryRes.data);
         setTransactions(transactionsRes.data.slice(0, 5));
+        setCurrency((portfolioRes.data.currency || 'USD') as Currency);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -148,9 +152,9 @@ export default function DashboardPage() {
   }
 
   const stats: { title: string; value: string; change: string; changeType: 'up' | 'down' | 'neutral'; icon: typeof Wallet }[] = [
-    { title: 'Total Balance', value: `$${(summary?.total_value || 0).toFixed(2)}`, change: '+5.2%', changeType: 'up', icon: Wallet },
+    { title: 'Total Balance', value: formatCurrency(summary?.total_value || 0, currency), change: '+5.2%', changeType: 'up', icon: Wallet },
     { title: 'Open Positions', value: `${summary?.positions.filter(p => p.status === 'open').length || 0}`, change: '+2', changeType: 'up', icon: TrendingUp },
-    { title: 'Total PnL', value: `$${(summary?.total_pnl || 0).toFixed(2)}`, change: `${(summary?.total_pnl_percent || 0).toFixed(2)}%`, changeType: (summary?.total_pnl_percent || 0) >= 0 ? 'up' : 'down', icon: TrendingUp },
+    { title: 'Total PnL', value: formatCurrency(summary?.total_pnl || 0, currency), change: `${(summary?.total_pnl_percent || 0).toFixed(2)}%`, changeType: (summary?.total_pnl_percent || 0) >= 0 ? 'up' : 'down', icon: TrendingUp },
     { title: 'Last Trade', value: '-', change: '-', changeType: 'neutral', icon: Clock },
   ];
 
@@ -182,7 +186,7 @@ export default function DashboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {summary?.positions.filter(p => p.status === 'open').map((position) => (
-                <PositionCard key={position.position_id} position={position} />
+                <PositionCard key={position.position_id} position={position} currency={currency} />
               ))}
               {(!summary || summary.positions.filter(p => p.status === 'open').length === 0) && (
                 <div className="col-span-2 bg-dark-800 rounded-xl p-8 text-center border border-dark-700">

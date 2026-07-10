@@ -13,7 +13,7 @@ Ledgerline is not an auto-trading bot and does not place orders. It is a single-
 
 ## Features
 
-- **Trading Module**: Workspace management, portfolio tracking, transaction recording, position aggregation
+- **Trading Module**: Workspace management, portfolio tracking with multi-currency support, transaction recording (open/add/reduce/close), position aggregation
 - **Market Data**: OHLCV data storage, real-time price fetching, exchange connector abstraction
 - **Technical Indicators**: SMA, EMA, MACD, RSI, Bollinger Bands, Momentum, ROC, Volume MA
 - **Strategy System**: Plugin-based strategy architecture with RSI, MACD, MA Cross, Bollinger strategies
