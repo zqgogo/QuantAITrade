@@ -17,9 +17,18 @@ class TransactionCreate(BaseModel):
 
 
 class TransactionResponse(BaseModel):
-    transaction_id: int
-    position_id: int
-    position_status: str
+    id: int
+    portfolio_id: int | None
+    position_id: int | None
+    market: str
+    symbol: str
+    side: str
+    type: str
+    quantity: float
+    price: float
+    amount: float
+    fee: float
+    created_at: str
 
 
 class PositionSummary(BaseModel):

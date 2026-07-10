@@ -93,6 +93,28 @@ async def record_transaction(data: TransactionCreate):
     return result
 
 
+@router.get("/transactions", response_model=list[TransactionResponse])
+async def list_transactions(portfolio_id: int | None = None):
+    transactions = repository.get_transactions(portfolio_id)
+    return [
+        {
+            "id": t.id,
+            "portfolio_id": t.position.portfolio_id if t.position else None,
+            "position_id": t.position_id,
+            "market": t.position.market if t.position else "",
+            "symbol": t.position.symbol if t.position else "",
+            "side": t.position.side if t.position else "",
+            "type": t.type,
+            "quantity": float(t.quantity),
+            "price": float(t.price),
+            "amount": float(t.price * t.quantity),
+            "fee": 0,
+            "created_at": t.created_at.isoformat(),
+        }
+        for t in transactions
+    ]
+
+
 @router.get("/portfolios/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
 async def get_portfolio_summary(portfolio_id: int):
     portfolio = repository.get_portfolio(portfolio_id)

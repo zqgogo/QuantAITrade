@@ -103,7 +103,7 @@ export default function ChatPanel() {
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
               </div>
               <p className="text-xs text-dark-600 mt-1">
-                {new Date(message.timestamp).toLocaleTimeString()}
+                {new Date(message.timestamp).toLocaleTimeString('en-US', { hour12: false })}
               </p>
             </div>
           </div>

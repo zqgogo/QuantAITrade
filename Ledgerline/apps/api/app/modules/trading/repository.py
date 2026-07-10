@@ -133,6 +133,13 @@ class TradingRepository:
             .order_by(Transaction.executed_at)
         ).all()
 
+    def get_transactions(self, portfolio_id: int | None = None) -> Sequence[Transaction]:
+        query = select(Transaction).options(joinedload(Transaction.position)).order_by(Transaction.created_at.desc())
+        if portfolio_id:
+            query = query.join(Position).where(Position.portfolio_id == portfolio_id)
+        return self.db.scalars(query).all()
+
+
     def get_watchlist_items(self, portfolio_id: int) -> Sequence[Watchlist]:
         return self.db.scalars(
             select(Watchlist)
