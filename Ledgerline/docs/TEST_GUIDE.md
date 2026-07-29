@@ -106,22 +106,33 @@ npm run dev
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 1.1 | 获取 K 线数据 | GET `/api/v1/market/ohlcv?market=crypto&symbol=BTCUSDT&interval=1d&limit=10` | 返回 OHLCV 数据列表 |
-| 1.2 | 获取多个间隔 | GET `/api/v1/market/ohlcv?market=crypto&symbol=BTCUSDT&interval=1h&limit=24` | 返回 24 小时 K 线数据 |
+| 1.1 | 获取 K 线数据 | GET `/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1d&limit=10` | 返回 OHLCV 数据列表 |
+| 1.2 | 获取多个间隔 | GET `/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1h&limit=24` | 返回 24 小时 K 线数据 |
+| 1.3 | 获取带时间范围的 K 线 | GET `/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1d&start_time=2024-01-01T00:00:00&end_time=2024-06-30T23:59:59` | 返回指定时间范围内的 K 线数据 |
 
-### 2. 实时价格
-
-| 测试步骤 | 操作 | 预期结果 | 状态 |
-|---------|------|---------|------|
-| 2.1 | 获取当前价格 | GET `/api/v1/market/price/current?market=crypto&symbol=BTCUSDT` | 返回当前价格 |
-| 2.2 | 获取多个价格 | GET `/api/v1/market/price/batch?market=crypto&symbols=BTCUSDT,ETHUSDT` | 返回多个币种价格 |
-
-### 3. 市场状态
+### 2. OHLCV 数据刷新
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 获取市场列表 | GET `/api/v1/market/exchanges` | 返回支持的交易所列表 |
-| 3.2 | 获取交易对 | GET `/api/v1/market/symbols?market=crypto` | 返回交易对列表 |
+| 2.1 | 刷新 K 线数据 | POST `/api/v1/market/ohlcv/refresh?market=crypto&symbol=BTC/USDT&interval=1d&limit=100` | 返回刷新结果 |
+
+### 3. 实时价格
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 3.1 | 获取当前价格 | GET `/api/v1/market/price?market=crypto&symbol=BTC/USDT` | 返回当前价格 |
+
+### 4. 数据进度
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 4.1 | 获取数据进度 | GET `/api/v1/market/progress?market=crypto&symbol=BTC/USDT&interval=1d` | 返回数据下载进度信息 |
+
+### 5. 市场状态
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 5.1 | 获取市场状态 | GET `/api/v1/market/status` | 返回市场模块状态信息 |
 
 ---
 
