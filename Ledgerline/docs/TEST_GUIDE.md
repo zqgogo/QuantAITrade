@@ -138,38 +138,54 @@ npm run dev
 
 ## 技术指标模块测试
 
-### 1. 移动平均线
+### 1. 获取可用指标
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 1.1 | 计算 SMA | GET `/api/v1/indicators/sma?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回 SMA 指标数据 |
-| 1.2 | 计算 EMA | GET `/api/v1/indicators/ema?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回 EMA 指标数据 |
+| 1.1 | 获取可用指标列表 | GET `/api/v1/indicators/available` | 返回所有可用指标名称和描述 |
 
-### 2. MACD
-
-| 测试步骤 | 操作 | 预期结果 | 状态 |
-|---------|------|---------|------|
-| 2.1 | 计算 MACD | GET `/api/v1/indicators/macd?market=crypto&symbol=BTCUSDT&interval=1d` | 返回 MACD、信号线、柱状图数据 |
-
-### 3. RSI
+### 2. 移动平均线
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 计算 RSI | GET `/api/v1/indicators/rsi?market=crypto&symbol=BTCUSDT&interval=1d&period=14` | 返回 RSI 值，范围 0-100 |
+| 2.1 | 计算 SMA | GET `/api/v1/indicators/sma?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回 SMA 指标数据 |
+| 2.2 | 计算 EMA | GET `/api/v1/indicators/ema?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回 EMA 指标数据 |
 
-### 4. 布林带
-
-| 测试步骤 | 操作 | 预期结果 | 状态 |
-|---------|------|---------|------|
-| 4.1 | 计算布林带 | GET `/api/v1/indicators/bollinger?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回上轨、中轨、下轨数据 |
-
-### 5. 其他指标
+### 3. MACD
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 5.1 | 计算动量 | GET `/api/v1/indicators/momentum?market=crypto&symbol=BTCUSDT&interval=1d&period=14` | 返回动量值 |
-| 5.2 | 计算 ROC | GET `/api/v1/indicators/roc?market=crypto&symbol=BTCUSDT&interval=1d&period=14` | 返回 ROC 值 |
-| 5.3 | 计算成交量均线 | GET `/api/v1/indicators/volume_ma?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回成交量均线数据 |
+| 3.1 | 计算 MACD（默认参数） | GET `/api/v1/indicators/macd?market=crypto&symbol=BTCUSDT&interval=1d` | 返回 MACD、信号线、柱状图数据（fast_period=12, slow_period=26, signal_period=9） |
+| 3.2 | 计算 MACD（自定义参数） | GET `/api/v1/indicators/macd?market=crypto&symbol=BTCUSDT&interval=1d&fast_period=10&slow_period=20&signal_period=5` | 返回自定义参数的 MACD 数据 |
+
+### 4. RSI
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 4.1 | 计算 RSI | GET `/api/v1/indicators/rsi?market=crypto&symbol=BTCUSDT&interval=1d&period=14` | 返回 RSI 值，范围 0-100 |
+
+### 5. 布林带
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 5.1 | 计算布林带（默认参数） | GET `/api/v1/indicators/bollinger?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回上轨、中轨、下轨数据（num_std=2.0） |
+| 5.2 | 计算布林带（自定义标准差） | GET `/api/v1/indicators/bollinger?market=crypto&symbol=BTCUSDT&interval=1d&period=20&num_std=1.5` | 返回自定义标准差的布林带数据 |
+
+### 6. 其他指标
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 6.1 | 计算动量 | GET `/api/v1/indicators/momentum?market=crypto&symbol=BTCUSDT&interval=1d&period=10` | 返回动量值 |
+| 6.2 | 计算 ROC | GET `/api/v1/indicators/roc?market=crypto&symbol=BTCUSDT&interval=1d&period=12` | 返回 ROC 值 |
+| 6.3 | 计算成交量均线 | GET `/api/v1/indicators/volume-ma?market=crypto&symbol=BTCUSDT&interval=1d&period=20` | 返回成交量均线数据 |
+
+### 7. 通用指标计算接口
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 7.1 | 计算指定指标 | GET `/api/v1/indicators/calculate?market=crypto&symbol=BTCUSDT&interval=1d&indicator=sma&period=20` | 返回指定指标的计算结果 |
+| 7.2 | 计算 MACD（通过通用接口） | GET `/api/v1/indicators/calculate?market=crypto&symbol=BTCUSDT&interval=1d&indicator=macd&fast_period=12&slow_period=26&signal_period=9` | 返回 MACD 数据 |
+| 7.3 | 计算布林带（通过通用接口） | GET `/api/v1/indicators/calculate?market=crypto&symbol=BTCUSDT&interval=1d&indicator=bollinger&period=20&num_std=2.0` | 返回布林带数据 |
 
 ---
 
