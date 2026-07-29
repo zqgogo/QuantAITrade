@@ -41,8 +41,8 @@ function TradeForm() {
     async function fetchPositions() {
       if (formData.portfolio_id) {
         try {
-          const res = await tradingApi.positions.list(formData.portfolio_id);
-          const openPositions = res.data.filter((p: PositionAggregate) => p.status === 'open');
+          const res = await tradingApi.portfolios.summary(formData.portfolio_id);
+          const openPositions = res.data.positions.filter((p: PositionAggregate) => p.status === 'open');
           setPositions(openPositions);
         } catch (error) {
           console.error('Failed to fetch positions:', error);

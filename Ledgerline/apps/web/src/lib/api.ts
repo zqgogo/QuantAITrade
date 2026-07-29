@@ -6,7 +6,7 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || 'dev-key',
+    'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || 'dev-secret-key',
   },
 });
 
@@ -63,6 +63,8 @@ export interface Position {
 
 export interface PositionAggregate {
   position_id: number;
+  portfolio_id: number;
+  market: string;
   symbol: string;
   side: 'buy' | 'sell';
   status: 'open' | 'closed';
@@ -70,6 +72,7 @@ export interface PositionAggregate {
   avg_price: number;
   total_amount: number;
   total_fee: number;
+  current_price: number | null;
   pnl: number | null;
   pnl_percent: number | null;
   opened_at: string;

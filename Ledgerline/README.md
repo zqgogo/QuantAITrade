@@ -83,7 +83,7 @@ npm run dev
 All API endpoints require an API key in the `X-API-Key` header:
 
 ```bash
-curl -H "X-API-Key: ledgerline-secret-key" http://localhost:8000/api/v1/trading/portfolios
+curl -H "X-API-Key: dev-secret-key" http://localhost:8000/api/v1/trading/portfolios
 ```
 
 For production, set the `LEDGERLINE_API_KEY` environment variable.
@@ -163,7 +163,7 @@ For production, set the `LEDGERLINE_API_KEY` environment variable.
 ### 1. Create a Portfolio
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"name": "My Portfolio", "description": "Main trading portfolio"}' \
   http://localhost:8000/api/v1/trading/portfolios
@@ -172,7 +172,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 2. Record a Transaction
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
     "portfolio_id": 1,
@@ -190,14 +190,14 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 3. Get Market Data
 
 ```bash
-curl -H "X-API-Key: ledgerline-secret-key" \
+curl -H "X-API-Key: dev-secret-key" \
   "http://localhost:8000/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1d&limit=30"
 ```
 
 ### 4. Calculate RSI
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d", "period": 14}' \
   http://localhost:8000/api/v1/indicators/rsi
@@ -206,7 +206,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 5. Get Strategy Signal
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d"}' \
   http://localhost:8000/api/v1/strategies/rsi/signal
@@ -215,14 +215,14 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 6. Run Backtest
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   "http://localhost:8000/api/v1/backtesting/quick-run?strategy=rsi&market=crypto&symbol=BTC/USDT&interval=1d&initial_capital=10000"
 ```
 
 ### 7. AI Chat
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"message": "Analyze my portfolio", "include_context": true}' \
   http://localhost:8000/api/v1/ai/chat
@@ -231,7 +231,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 8. Create Price Alert
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "BTC Price Alert",

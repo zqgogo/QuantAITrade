@@ -83,7 +83,7 @@ npm run dev
 所有 API 端点都需要在 `X-API-Key` 请求头中提供 API 密钥：
 
 ```bash
-curl -H "X-API-Key: ledgerline-secret-key" http://localhost:8000/api/v1/trading/portfolios
+curl -H "X-API-Key: dev-secret-key" http://localhost:8000/api/v1/trading/portfolios
 ```
 
 生产环境中，请设置 `LEDGERLINE_API_KEY` 环境变量。
@@ -163,7 +163,7 @@ curl -H "X-API-Key: ledgerline-secret-key" http://localhost:8000/api/v1/trading/
 ### 1. 创建投资组合
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"name": "我的投资组合", "description": "主要交易组合"}' \
   http://localhost:8000/api/v1/trading/portfolios
@@ -172,7 +172,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 2. 记录交易
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
     "portfolio_id": 1,
@@ -190,14 +190,14 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 3. 获取市场数据
 
 ```bash
-curl -H "X-API-Key: ledgerline-secret-key" \
+curl -H "X-API-Key: dev-secret-key" \
   "http://localhost:8000/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1d&limit=30"
 ```
 
 ### 4. 计算 RSI 指标
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d", "period": 14}' \
   http://localhost:8000/api/v1/indicators/rsi
@@ -206,7 +206,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 5. 获取策略信号
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d"}' \
   http://localhost:8000/api/v1/strategies/rsi/signal
@@ -215,14 +215,14 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 6. 运行回测
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   "http://localhost:8000/api/v1/backtesting/quick-run?strategy=rsi&market=crypto&symbol=BTC/USDT&interval=1d&initial_capital=10000"
 ```
 
 ### 7. AI 聊天
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"message": "分析我的投资组合", "include_context": true}' \
   http://localhost:8000/api/v1/ai/chat
@@ -231,7 +231,7 @@ curl -X POST -H "X-API-Key: ledgerline-secret-key" \
 ### 8. 创建价格告警
 
 ```bash
-curl -X POST -H "X-API-Key: ledgerline-secret-key" \
+curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "BTC 价格告警",
