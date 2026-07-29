@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, Check, AlertCircle, TrendingUp, X } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { tradingApi, Notification } from '@/lib/api';
+import { tradingApi, Notification, Portfolio } from '@/lib/api';
 
 const notificationIcons = {
   info: Bell,
@@ -51,16 +51,36 @@ function NotificationItem({ notification, onMarkRead }: { notification: Notifica
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchNotifications();
+    async function fetchPortfolios() {
+      try {
+        const res = await tradingApi.portfolios.list();
+        setPortfolios(res.data);
+        if (res.data.length > 0) {
+          setSelectedPortfolioId(res.data[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch portfolios:', error);
+      }
+    }
+    fetchPortfolios();
   }, []);
 
+  useEffect(() => {
+    if (selectedPortfolioId) {
+      fetchNotifications();
+    }
+  }, [selectedPortfolioId]);
+
   async function fetchNotifications() {
+    if (!selectedPortfolioId) return;
     setLoading(true);
     try {
-      const res = await tradingApi.notifications.list();
+      const res = await tradingApi.notifications.list(selectedPortfolioId);
       setNotifications(res.data);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -104,10 +124,33 @@ export default function NotificationsPage() {
               {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All caught up'}
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors">
-            <X className="w-4 h-4" />
-            Clear All
-          </button>
+          <div className="flex gap-4">
+            {portfolios.length > 0 && (
+              <select
+                value={selectedPortfolioId || ''}
+                onChange={(e) => setSelectedPortfolioId(parseInt(e.target.value))}
+                className="bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
+              >
+                {portfolios.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={async () => {
+                if (selectedPortfolioId) {
+                  await tradingApi.notifications.markAllRead(selectedPortfolioId);
+                  setNotifications(notifications.map(n => ({ ...n, read: true })));
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Mark All Read
+            </button>
+          </div>
         </div>
 
         {notifications.length > 0 ? (

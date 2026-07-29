@@ -187,14 +187,15 @@ export const tradingApi = {
     close: (id: number) => api.post(`/trading/positions/${id}/close`),
   },
   watchlist: {
-    list: () => api.get<WatchlistItem[]>('/trading/watchlist'),
+    list: (portfolioId: number) => api.get<WatchlistItem[]>(`/trading/portfolios/${portfolioId}/watchlist`),
     add: (data: { portfolio_id: number; market: string; symbol: string; alias?: string }) => api.post<WatchlistItem>('/trading/watchlist', data),
-    update: (id: number, data: { alias?: string }) => api.put<WatchlistItem>(`/trading/watchlist/${id}`, data),
+    update: (id: number, data: { alias?: string; alert_price_high?: number; alert_price_low?: number }) => api.put<WatchlistItem>(`/trading/watchlist/${id}`, data),
     remove: (id: number) => api.delete(`/trading/watchlist/${id}`),
   },
   notifications: {
-    list: () => api.get<Notification[]>('/trading/notifications'),
+    list: (portfolioId: number) => api.get<Notification[]>(`/trading/portfolios/${portfolioId}/notifications`),
     markRead: (id: number) => api.put(`/trading/notifications/${id}/read`),
+    markAllRead: (portfolioId: number) => api.put(`/trading/portfolios/${portfolioId}/notifications/read-all`),
   },
 };
 
