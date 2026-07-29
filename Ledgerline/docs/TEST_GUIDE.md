@@ -191,26 +191,38 @@ npm run dev
 
 ## 策略系统测试
 
-### 1. 策略列表
+### 1. 获取可用策略
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 1.1 | 获取策略列表 | GET `/api/v1/strategies/list` | 返回所有可用策略 |
+| 1.1 | 获取可用策略列表 | GET `/api/v1/strategies/available` | 返回所有可用策略名称和描述 |
 
-### 2. 策略信号
-
-| 测试步骤 | 操作 | 预期结果 | 状态 |
-|---------|------|---------|------|
-| 2.1 | RSI 策略信号 | GET `/api/v1/strategies/rsi?market=crypto&symbol=BTCUSDT&interval=1d` | 返回 RSI 策略信号（buy/sell/hold） |
-| 2.2 | MACD 策略信号 | GET `/api/v1/strategies/macd?market=crypto&symbol=BTCUSDT&interval=1d` | 返回 MACD 策略信号 |
-| 2.3 | 均线交叉策略 | GET `/api/v1/strategies/moving_average_cross?market=crypto&symbol=BTCUSDT&interval=1d` | 返回均线交叉信号 |
-| 2.4 | 布林带策略 | GET `/api/v1/strategies/bollinger?market=crypto&symbol=BTCUSDT&interval=1d` | 返回布林带信号 |
-
-### 3. 多策略共识
+### 2. 运行单个策略
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 获取策略共识 | GET `/api/v1/strategies/consensus?market=crypto&symbol=BTCUSDT&interval=1d` | 返回综合信号和各策略投票结果 |
+| 2.1 | 运行 RSI 策略 | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=rsi` | 返回 RSI 策略信号（buy/sell/hold） |
+| 2.2 | 运行 RSI 策略（自定义阈值） | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=rsi&period=14&oversold_threshold=30&overbought_threshold=70` | 返回自定义参数的 RSI 策略信号 |
+| 2.3 | 运行 MACD 策略 | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=macd` | 返回 MACD 策略信号 |
+| 2.4 | 运行 MACD 策略（自定义参数） | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=macd&fast_period=12&slow_period=26&signal_period=9` | 返回自定义参数的 MACD 策略信号 |
+| 2.5 | 运行均线交叉策略 | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=moving_average_cross` | 返回均线交叉信号 |
+| 2.6 | 运行均线交叉策略（自定义参数） | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=moving_average_cross&short_period=10&long_period=20&ma_type=ema` | 返回自定义参数的均线交叉信号 |
+| 2.7 | 运行布林带策略 | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=bollinger` | 返回布林带信号 |
+| 2.8 | 运行布林带策略（自定义参数） | POST `/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=bollinger&period=20&num_std=2.0` | 返回自定义参数的布林带信号 |
+
+### 3. 通过名称运行策略
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 3.1 | 通过路径运行策略 | GET `/api/v1/strategies/run/rsi?market=crypto&symbol=BTCUSDT&interval=1d` | 返回 RSI 策略信号 |
+| 3.2 | 通过路径运行策略（带参数） | GET `/api/v1/strategies/run/rsi?market=crypto&symbol=BTCUSDT&interval=1d&period=14` | 返回自定义参数的 RSI 策略信号 |
+
+### 4. 运行多个策略
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 4.1 | 运行多个策略 | POST `/api/v1/strategies/run/multiple?market=crypto&symbol=BTCUSDT&interval=1d&strategies=rsi&strategies=macd&strategies=bollinger` | 返回多个策略的综合信号结果 |
+| 4.2 | 运行多个策略（带默认参数） | POST `/api/v1/strategies/run/multiple?market=crypto&symbol=BTCUSDT&interval=1d&strategies=rsi&strategies=macd&period=20` | 返回多个策略的综合信号结果（使用默认 period） |
 
 ---
 
@@ -220,22 +232,23 @@ npm run dev
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 1.1 | 检查 AI 状态 | GET `/api/v1/ai/status` | 返回 AI 模块状态和可用模型 |
+| 1.1 | 检查 AI 状态 | GET `/api/v1/ai/status` | 返回 AI 模块状态，包含 module、status、llm_provider、embedding_provider、embedding_model、agent_runtime、available_models 等信息 |
 
 ### 2. AI 聊天
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 2.1 | 基础聊天 | POST `/api/v1/ai/chat`<br>Body: `{"message": "你好"}` | 返回 AI 回复 |
-| 2.2 | 市场分析 | POST `/api/v1/ai/chat`<br>Body: `{"message": "分析一下 BTC 的走势", "include_context": true}` | 返回带市场上下文的分析 |
-| 2.3 | 组合分析 | POST `/api/v1/ai/chat/portfolio` | 返回投资组合分析 |
-| 2.4 | 信号分析 | POST `/api/v1/ai/chat/signal?strategy=rsi&symbol=BTCUSDT&market=crypto&interval=1d` | 返回策略信号分析 |
+| 2.1 | 基础聊天 | POST `/api/v1/ai/chat`<br>Body: `{"message": "你好"}` | 返回 ChatResponse，包含 content、timestamp、model、runtime、context_used |
+| 2.2 | 市场分析（含上下文） | POST `/api/v1/ai/chat`<br>Body: `{"message": "分析一下 BTC 的走势", "include_context": true}` | 返回带市场上下文的分析，context_used 为 true |
+| 2.3 | 指定工作区和模型 | POST `/api/v1/ai/chat`<br>Body: `{"message": "分析市场", "workspace_id": 1, "include_context": true, "model": "gpt-4"}` | 返回指定工作区和模型的分析结果 |
+| 2.4 | 投资组合分析 | POST `/api/v1/ai/chat/portfolio` | 返回投资组合分析，自动包含上下文（context_used 为 true） |
+| 2.5 | 策略信号分析 | POST `/api/v1/ai/chat/signal?strategy=rsi&symbol=BTCUSDT&market=crypto&interval=1d` | 返回策略信号分析，使用 Query 参数指定策略和交易对 |
 
 ### 3. AI 上下文
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 获取上下文 | GET `/api/v1/ai/context` | 返回当前 AI 使用的交易和市场上下文 |
+| 3.1 | 获取上下文摘要 | GET `/api/v1/ai/context` | 返回 ContextSummary，包含 positions_count、total_value、recent_trades_count、watchlist_count |
 
 ---
 
@@ -245,18 +258,34 @@ npm run dev
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 1.1 | 单策略回测 | POST `/api/v1/backtesting/run`<br>Body: `{"strategy": "rsi", "market": "crypto", "symbol": "BTCUSDT", "interval": "1d", "start_date": "2024-01-01", "end_date": "2024-06-30", "initial_capital": 10000}` | 返回回测结果和性能指标 |
-| 1.2 | 多策略回测 | POST `/api/v1/backtesting/run`<br>Body: `{"strategy": "consensus", "market": "crypto", "symbol": "BTCUSDT", "interval": "1d", "start_date": "2024-01-01", "end_date": "2024-06-30", "initial_capital": 10000}` | 返回多策略共识回测结果 |
+| 1.1 | 单策略回测 | POST `/api/v1/backtesting/run`<br>Body: `{"strategy_name": "rsi", "market": "crypto", "symbol": "BTCUSDT", "interval": "1d", "start_date": "2024-01-01", "end_date": "2024-06-30", "initial_capital": 10000}` | 返回回测结果和性能指标 |
+| 1.2 | 多策略回测 | POST `/api/v1/backtesting/run/multiple?strategies=rsi&strategies=macd&market=crypto&symbol=BTCUSDT&interval=1d&initial_capital=10000` | 返回多策略回测结果列表 |
+| 1.3 | 快速回测 | POST `/api/v1/backtesting/quick-run?strategy=rsi&market=crypto&symbol=BTCUSDT&interval=1d&initial_capital=10000&position_size=0.02&commission_rate=0.001` | 返回快速回测结果 |
 
-### 2. 回测指标验证
+### 2. 策略管理
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 2.1 | 获取可用策略 | GET `/api/v1/backtesting/strategies` | 返回策略名称列表 |
+| 2.2 | 获取回测结果 | GET `/api/v1/backtesting/results` | 返回最近回测结果摘要列表 |
+
+### 3. 回测指标验证
 
 验证返回的性能指标包含：
 - 总收益率 (total_return)
 - 年化收益率 (annualized_return)
 - 最大回撤 (max_drawdown)
 - 夏普比率 (sharpe_ratio)
+- 索提诺比率 (sortino_ratio)
 - 胜率 (win_rate)
+- 盈利因子 (profit_factor)
 - 交易次数 (total_trades)
+- 盈利交易次数 (winning_trades)
+- 亏损交易次数 (losing_trades)
+- 平均盈利 (avg_win)
+- 平均亏损 (avg_loss)
+- 最佳交易 (best_trade)
+- 最差交易 (worst_trade)
 
 ---
 
@@ -269,25 +298,28 @@ npm run dev
 | 1.1 | 创建价格高于告警 | POST `/api/v1/monitoring/alerts/price`<br>Body: `{"name": "BTC 价格高于告警", "market": "crypto", "symbol": "BTCUSDT", "type": "price_above", "threshold": 110000, "severity": "warning"}` | 返回告警规则 |
 | 1.2 | 创建价格低于告警 | POST `/api/v1/monitoring/alerts/price`<br>Body: `{"name": "BTC 价格低于告警", "market": "crypto", "symbol": "BTCUSDT", "type": "price_below", "threshold": 90000, "severity": "critical"}` | 返回告警规则 |
 | 1.3 | 创建价格变动告警 | POST `/api/v1/monitoring/alerts/price`<br>Body: `{"name": "BTC 价格变动告警", "market": "crypto", "symbol": "BTCUSDT", "type": "price_change", "threshold": 5, "severity": "info"}` | 返回告警规则 |
-| 1.4 | 查询告警规则 | GET `/api/v1/monitoring/alerts/rules` | 返回所有告警规则 |
-| 1.5 | 启用/禁用规则 | PATCH `/api/v1/monitoring/alerts/rules/{id}/toggle` | 返回 `{"success": true}` |
-| 1.6 | 删除规则 | DELETE `/api/v1/monitoring/alerts/rules/{id}` | 返回 `{"success": true}` |
+| 1.4 | 创建信号告警 | POST `/api/v1/monitoring/alerts/signal`<br>Body: `{"name": "RSI 信号告警", "market": "crypto", "symbol": "BTCUSDT", "strategy": "rsi", "signal_type": "buy", "severity": "info"}` | 返回告警规则 |
+| 1.5 | 查询所有告警规则 | GET `/api/v1/monitoring/alerts/rules` | 返回所有告警规则列表 |
+| 1.6 | 查询单个告警规则 | GET `/api/v1/monitoring/alerts/rules/{rule_id}` | 返回指定告警规则详情 |
+| 1.7 | 启用/禁用规则 | PATCH `/api/v1/monitoring/alerts/rules/{rule_id}/toggle` | 返回 `{"success": true, "message": "Rule toggled"}` |
+| 1.8 | 删除规则 | DELETE `/api/v1/monitoring/alerts/rules/{rule_id}` | 返回 `{"success": true, "message": "Rule deleted"}` |
 
 ### 2. 价格监控
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 2.1 | 启动价格监控 | POST `/api/v1/monitoring/monitor/start?market=crypto&symbol=BTCUSDT&interval=5` | 返回成功消息 |
-| 2.2 | 获取监控列表 | GET `/api/v1/monitoring/monitor/symbols` | 返回正在监控的交易对 |
-| 2.3 | 停止价格监控 | POST `/api/v1/monitoring/monitor/stop?market=crypto&symbol=BTCUSDT` | 返回成功消息 |
+| 2.1 | 启动价格监控 | POST `/api/v1/monitoring/monitor/start?market=crypto&symbol=BTCUSDT&interval=5` | 返回 `{"success": true, "message": "Started monitoring crypto:BTCUSDT"}` |
+| 2.2 | 获取监控列表 | GET `/api/v1/monitoring/monitor/symbols` | 返回 `{"success": true, "symbols": [...]}` 包含正在监控的交易对 |
+| 2.3 | 停止价格监控 | POST `/api/v1/monitoring/monitor/stop?market=crypto&symbol=BTCUSDT` | 返回 `{"success": true, "message": "Stopped monitoring crypto:BTCUSDT"}` |
+| 2.4 | 获取当前价格 | GET `/api/v1/monitoring/price/current?market=crypto&symbol=BTCUSDT` | 返回当前价格数据或无数据提示 |
 
 ### 3. 告警通知
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 查询告警通知 | GET `/api/v1/monitoring/alerts/notifications` | 返回告警通知列表 |
-| 3.2 | 标记已读 | PATCH `/api/v1/monitoring/alerts/notifications/{id}/read` | 返回成功消息 |
-| 3.3 | 全部标记已读 | PATCH `/api/v1/monitoring/alerts/notifications/read-all` | 返回标记数量 |
+| 3.1 | 查询告警通知 | GET `/api/v1/monitoring/alerts/notifications?limit=20` | 返回告警通知列表，默认返回最近20条 |
+| 3.2 | 标记单条已读 | PATCH `/api/v1/monitoring/alerts/notifications/{alert_id}/read` | 返回 `{"success": true, "message": "Alert marked as read"}` |
+| 3.3 | 全部标记已读 | PATCH `/api/v1/monitoring/alerts/notifications/read-all` | 返回 `{"success": true, "message": "Marked {count} alerts as read"}` |
 
 ### 4. WebSocket 实时推送
 
