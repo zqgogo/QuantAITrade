@@ -54,22 +54,22 @@ npm run dev
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
 | 1.1 | 创建工作区 | POST `/api/v1/trading/workspaces`<br>Body: `{"name": "测试工作区"}` | 返回工作区对象，包含 id 和 name |
-| 1.2 | 查询工作区 | GET `/api/v1/trading/workspaces/{id}` | 返回工作区详情 |
+| 1.2 | 查询工作区 | GET `/api/v1/trading/workspaces/{workspace_id}` | 返回工作区详情 |
 
 ### 2. 投资组合管理
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 2.1 | 创建投资组合 | POST `/api/v1/trading/portfolios`<br>Body: `{"workspace_id": 1, "name": "测试组合"}` | 返回投资组合对象 |
-| 2.2 | 查询投资组合 | GET `/api/v1/trading/portfolios/{id}` | 返回投资组合详情 |
-| 2.3 | 获取组合摘要 | GET `/api/v1/trading/portfolios/{id}/summary` | 返回组合持仓汇总 |
+| 2.1 | 创建投资组合 | POST `/api/v1/trading/portfolios`<br>Body: `{"workspace_id": 1, "name": "测试组合", "currency": "USDT"}` | 返回投资组合对象 |
+| 2.2 | 查询投资组合 | GET `/api/v1/trading/portfolios/{portfolio_id}` | 返回投资组合详情 |
+| 2.3 | 获取组合摘要 | GET `/api/v1/trading/portfolios/{portfolio_id}/summary` | 返回组合持仓汇总 |
 
 ### 3. 交易记录
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 记录开仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "open", "price": 100000, "quantity": 0.1, "executed_at": "2024-01-01T00:00:00"}` | 返回交易记录，自动创建持仓 |
-| 3.2 | 记录加仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "add", "price": 105000, "quantity": 0.1, "executed_at": "2024-01-02T00:00:00"}` | 返回交易记录，持仓数量增加 |
+| 3.1 | 记录开仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "open", "price": 100000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-01T00:00:00", "note": "开仓测试"}` | 返回交易记录，自动创建持仓 |
+| 3.2 | 记录加仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "add", "price": 105000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-02T00:00:00"}` | 返回交易记录，持仓数量增加 |
 | 3.3 | 查询交易列表 | GET `/api/v1/trading/transactions` | 返回交易列表 |
 | 3.4 | 查询指定组合交易 | GET `/api/v1/trading/transactions?portfolio_id=1` | 返回指定组合的交易列表 |
 
@@ -77,18 +77,26 @@ npm run dev
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 4.1 | 查询持仓详情 | GET `/api/v1/trading/positions/{id}` | 返回持仓详情，包含平均成本和数量 |
-| 4.2 | 查询组合持仓 | GET `/api/v1/trading/positions?portfolio_id=1` | 返回组合的所有持仓 |
-| 4.3 | 平仓 | POST `/api/v1/trading/positions/{id}/close` | 持仓状态变为 closed |
+| 4.1 | 查询持仓详情 | GET `/api/v1/trading/positions/{position_id}` | 返回持仓详情，包含平均成本和数量 |
+| 4.2 | 查询持仓详情（含当前价格） | GET `/api/v1/trading/positions/{position_id}?current_price=110000` | 返回持仓详情，包含当前市值和盈亏 |
 
 ### 5. 自选列表
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 5.1 | 添加自选 | POST `/api/v1/trading/watchlist`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT"}` | 返回自选项目 |
-| 5.2 | 查询自选 | GET `/api/v1/trading/portfolios/{id}/watchlist` | 返回自选列表 |
-| 5.3 | 更新自选 | PUT `/api/v1/trading/watchlist/{id}`<br>Body: `{"alert_price_high": 110000, "alert_price_low": 90000}` | 更新成功 |
-| 5.4 | 删除自选 | DELETE `/api/v1/trading/watchlist/{id}` | 返回 `{"status": "deleted"}` |
+| 5.1 | 添加自选 | POST `/api/v1/trading/watchlist`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "alert_price_high": 110000, "alert_price_low": 90000, "enabled": true}` | 返回自选项目 |
+| 5.2 | 查询自选 | GET `/api/v1/trading/portfolios/{portfolio_id}/watchlist` | 返回自选列表 |
+| 5.3 | 更新自选 | PUT `/api/v1/trading/watchlist/{watchlist_id}`<br>Body: `{"alert_price_high": 110000, "alert_price_low": 90000, "enabled": true}` | 更新成功 |
+| 5.4 | 删除自选 | DELETE `/api/v1/trading/watchlist/{watchlist_id}` | 返回 `{"status": "deleted"}` |
+
+### 6. 通知管理
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 6.1 | 查询通知列表 | GET `/api/v1/trading/portfolios/{portfolio_id}/notifications` | 返回通知列表 |
+| 6.2 | 查询指定状态通知 | GET `/api/v1/trading/portfolios/{portfolio_id}/notifications?status=unread` | 返回未读通知列表 |
+| 6.3 | 标记单条已读 | PUT `/api/v1/trading/notifications/{notification_id}/read` | 返回 `{"status": "marked_as_read"}` |
+| 6.4 | 标记全部已读 | PUT `/api/v1/trading/portfolios/{portfolio_id}/notifications/read-all` | 返回 `{"status": "all_marked_as_read"}` |
 
 ---
 
