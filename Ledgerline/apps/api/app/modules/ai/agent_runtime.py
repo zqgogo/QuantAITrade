@@ -50,19 +50,10 @@ class LedgerlineAgentRuntime(AgentRuntime):
         
         model_name = request.model or self.config.active_llm.default_model
         
-        from app.modules.ai.providers import ChatMessage, MockLlmProvider
+        from app.modules.ai.providers import ChatMessage
         
         chat_messages = [ChatMessage(role=m["role"], content=m["content"]) for m in messages]
-        
-        try:
-            provider = self._get_llm_provider()
-            response_text = await provider.complete(chat_messages)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("LLM call failed (%s), falling back to Mock: %s", type(e).__name__, str(e)[:200])
-            mock_provider = MockLlmProvider(self.config.active_llm)
-            response_text = await mock_provider.complete(chat_messages)
-            response_text = f"_{response_text}_\n\n---\n⚠️ *Real LLM unavailable ({type(e).__name__}), shown from fallback.*"
+        response_text = await self._get_llm_provider().complete(chat_messages)
         
         return AgentResponse(
             content=response_text,

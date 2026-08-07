@@ -11,6 +11,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(description="User message")
+    session_id: Optional[int] = Field(None, description="Session ID (creates new if omitted)")
     workspace_id: Optional[int] = Field(None, description="Workspace ID for context")
     include_context: bool = Field(True, description="Whether to include trading context")
     model: Optional[str] = Field(None, description="Override default model")
@@ -22,6 +23,36 @@ class ChatResponse(BaseModel):
     model: str = Field(description="Model used")
     runtime: str = Field(description="Agent runtime")
     context_used: bool = Field(description="Whether context was used")
+    session_id: Optional[int] = Field(None, description="Session ID")
+
+
+class ChatSessionResponse(BaseModel):
+    id: int
+    title: str
+    workspace_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0
+
+
+class ChatSessionListResponse(BaseModel):
+    sessions: List[ChatSessionResponse]
+
+
+class ChatMessageRecord(BaseModel):
+    id: int
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ChatSessionDetailResponse(BaseModel):
+    id: int
+    title: str
+    workspace_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    messages: List[ChatMessageRecord]
 
 
 class ChatHistoryItem(BaseModel):

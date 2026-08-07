@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.auth import verify_api_key
 from app.core.config import settings
+from app.db.session import init_databases
 
 
 def create_app() -> FastAPI:
@@ -16,6 +17,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.on_event("startup")
+    def _on_startup() -> None:
+        init_databases()
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:

@@ -115,6 +115,7 @@ export interface ChatMessage {
 
 export interface ChatRequest {
   message: string;
+  session_id?: number;
   workspace_id?: number;
   include_context?: boolean;
   model?: string;
@@ -126,6 +127,25 @@ export interface ChatResponse {
   model: string;
   runtime: string;
   context_used: boolean;
+  session_id?: number;
+}
+
+export interface ChatSessionResponse {
+  id: number;
+  title: string;
+  workspace_id: number | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ChatSessionDetail {
+  id: number;
+  title: string;
+  workspace_id: number | null;
+  created_at: string;
+  updated_at: string;
+  messages: { id: number; role: string; content: string; created_at: string }[];
 }
 
 export interface AiStatusResponse {
@@ -152,6 +172,12 @@ export interface TradeRecordRequest {
 export const aiApi = {
   status: () => api.get<AiStatusResponse>('/ai/status'),
   chat: (data: ChatRequest) => api.post<ChatResponse>('/ai/chat', data),
+  sessions: {
+    list: () => api.get<{ sessions: ChatSessionResponse[] }>('/ai/sessions'),
+    create: (title: string) => api.post<ChatSessionResponse>('/ai/sessions', { title }),
+    get: (id: number) => api.get<ChatSessionDetail>(`/ai/sessions/${id}`),
+    delete: (id: number) => api.delete(`/ai/sessions/${id}`),
+  },
   chatSignal: (params: { strategy: string; symbol: string; market: string; interval: string }) => 
     api.post<ChatResponse>('/ai/chat/signal', null, { params }),
   chatPortfolio: () => api.post<ChatResponse>('/ai/chat/portfolio'),
