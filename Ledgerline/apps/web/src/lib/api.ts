@@ -167,7 +167,7 @@ export const tradingApi = {
     delete: (id: number) => api.delete(`/trading/workspaces/${id}`),
   },
   portfolios: {
-    list: () => api.get<Portfolio[]>('/trading/portfolios'),
+    list: (workspaceId?: number) => api.get<Portfolio[]>('/trading/portfolios', { params: { workspace_id: workspaceId } }),
     create: (data: { workspace_id: number; name: string; description?: string }) => api.post<Portfolio>('/trading/portfolios', data),
     get: (id: number) => api.get<Portfolio>(`/trading/portfolios/${id}`),
     update: (id: number, data: { name?: string; description?: string }) => api.put<Portfolio>(`/trading/portfolios/${id}`, data),
@@ -181,10 +181,8 @@ export const tradingApi = {
     get: (id: number) => api.get<Transaction>(`/trading/transactions/${id}`),
   },
   positions: {
-    list: (portfolioId?: number) => api.get<Position[]>('/trading/positions', { params: { portfolio_id: portfolioId } }),
     get: (id: number, currentPrice?: number) => 
       api.get<PositionAggregate>(`/trading/positions/${id}`, { params: { current_price: currentPrice } }),
-    close: (id: number) => api.post(`/trading/positions/${id}/close`),
   },
   watchlist: {
     list: (portfolioId: number) => api.get<WatchlistItem[]>(`/trading/portfolios/${portfolioId}/watchlist`),
@@ -197,6 +195,10 @@ export const tradingApi = {
     markRead: (id: number) => api.put(`/trading/notifications/${id}/read`),
     markAllRead: (portfolioId: number) => api.put(`/trading/portfolios/${portfolioId}/notifications/read-all`),
   },
+};
+
+export const marketApi = {
+  price: (market: string, symbol: string) => api.get<{ market: string; symbol: string; price: number; timestamp: string }>('/market/price', { params: { market, symbol } }),
 };
 
 export default api;

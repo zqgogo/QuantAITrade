@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
-import { aiApi, ChatResponse } from '@/lib/api';
+import { aiApi, ChatResponse, AiStatusResponse } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -22,6 +22,11 @@ export default function ChatPanel() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState<AiStatusResponse | null>(null);
+
+  useEffect(() => {
+    aiApi.status().then(res => setAiStatus(res.data)).catch(() => {});
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -69,6 +74,10 @@ export default function ChatPanel() {
     }
   };
 
+  const isMock = aiStatus?.llm_provider === 'mock';
+  const providerName = aiStatus?.llm_provider ? aiStatus.llm_provider.toUpperCase() : '...';
+  const modelName = aiStatus?.available_models?.[0] || '';
+
   return (
     <div className="bg-dark-800 rounded-xl border border-dark-700 h-full flex flex-col">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-dark-700">
@@ -79,7 +88,9 @@ export default function ChatPanel() {
           <h3 className="font-semibold text-white">AI Trading Assistant</h3>
           <p className="text-xs text-dark-600 flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-primary-500" />
-            Mock Mode Active
+            {aiStatus ? (
+              isMock ? `Mock Mode` : `${providerName} · ${modelName}`
+            ) : 'Connecting...'}
           </p>
         </div>
       </div>

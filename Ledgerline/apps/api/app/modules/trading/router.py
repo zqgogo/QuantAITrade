@@ -1,7 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
+import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.modules.trading.models import TransactionType
 from app.modules.trading.repository import TradingRepository
@@ -36,6 +37,19 @@ async def create_workspace(data: WorkspaceCreate):
     }
 
 
+@router.get("/workspaces", response_model=list[WorkspaceResponse])
+async def list_workspaces():
+    workspaces = repository.get_workspaces()
+    return [
+        {
+            "id": w.id,
+            "name": w.name,
+            "created_at": w.created_at.isoformat(),
+        }
+        for w in workspaces
+    ]
+
+
 @router.get("/workspaces/{workspace_id}", response_model=WorkspaceResponse)
 async def get_workspace(workspace_id: int):
     workspace = repository.get_workspace(workspace_id)
@@ -58,6 +72,21 @@ async def create_portfolio(data: PortfolioCreate):
         "currency": portfolio.currency,
         "created_at": portfolio.created_at.isoformat(),
     }
+
+
+@router.get("/portfolios", response_model=list[PortfolioResponse])
+async def list_portfolios(workspace_id: int | None = Query(None, description="Filter by workspace")):
+    portfolios = repository.get_portfolios(workspace_id)
+    return [
+        {
+            "id": p.id,
+            "workspace_id": p.workspace_id,
+            "name": p.name,
+            "currency": p.currency,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in portfolios
+    ]
 
 
 @router.get("/portfolios/{portfolio_id}", response_model=PortfolioResponse)
@@ -119,12 +148,19 @@ async def list_transactions(portfolio_id: int | None = None):
 
 
 @router.get("/portfolios/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
-async def get_portfolio_summary(portfolio_id: int):
+async def get_portfolio_summary(portfolio_id: int, current_prices: str | None = Query(None, description="JSON dict of current prices")):
     portfolio = repository.get_portfolio(portfolio_id)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
-    return service.get_portfolio_summary(portfolio_id)
+    prices_dict = None
+    if current_prices:
+        try:
+            prices_dict = json.loads(current_prices)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="current_prices must be valid JSON")
+
+    return service.get_portfolio_summary(portfolio_id, prices_dict)
 
 
 @router.get("/positions/{position_id}", response_model=PositionDetailResponse)

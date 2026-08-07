@@ -54,7 +54,7 @@ class PositionAggregate:
             base.update({
                 "current_price": float(current_price),
                 "pnl": float(pnl),
-                "pnl_pct": float(pnl_pct),
+                "pnl_percent": float(pnl_pct),
             })
 
         return base
@@ -140,29 +140,48 @@ class TradingService:
             "created_at": transaction.created_at.isoformat(),
         }
 
-    def get_portfolio_summary(self, portfolio_id: int) -> dict[str, Any]:
+    def get_portfolio_summary(self, portfolio_id: int, current_prices: dict[str, float] | None = None) -> dict[str, Any]:
         portfolio = self.repository.get_portfolio(portfolio_id)
         open_positions = self.repository.get_open_positions(portfolio_id)
         aggregates = []
+        total_value = Decimal(0)
+        total_pnl = Decimal(0)
 
         for pos in open_positions:
             transactions = self.repository.get_transactions_by_position(pos.id)
             agg = PositionAggregate(pos, transactions)
-            agg_dict = agg.to_dict()
+            price_key = f"{pos.market}:{pos.symbol}"
+            current_price = None
+            if current_prices:
+                if price_key in current_prices:
+                    current_price = Decimal(str(current_prices[price_key]))
+                elif pos.symbol in current_prices:
+                    current_price = Decimal(str(current_prices[pos.symbol]))
+
+            agg_dict = agg.to_dict(current_price)
             agg_dict["total_amount"] = float(agg.total_quantity * agg.avg_price)
             agg_dict["total_fee"] = 0
-            agg_dict["pnl"] = None
-            agg_dict["pnl_percent"] = None
             aggregates.append(agg_dict)
 
-        total_value = sum(a["total_amount"] for a in aggregates)
+            total_value += agg.total_quantity * (current_price if current_price else agg.avg_price)
+            if current_price is not None:
+                if pos.side == "long":
+                    pnl = (current_price - agg.avg_price) * agg.total_quantity
+                else:
+                    pnl = (agg.avg_price - current_price) * agg.total_quantity
+                total_pnl += pnl
+
+        total_cost = sum(
+            agg.total_quantity * agg.avg_price for agg in [PositionAggregate(p, self.repository.get_transactions_by_position(p.id)) for p in open_positions]
+        )
+        total_pnl_pct = float(total_pnl / total_cost * 100) if total_cost > 0 else 0
 
         return {
             "portfolio_id": portfolio_id,
             "portfolio_name": portfolio.name if portfolio else "",
             "total_value": float(total_value),
-            "total_pnl": 0,
-            "total_pnl_percent": 0,
+            "total_pnl": float(total_pnl),
+            "total_pnl_percent": total_pnl_pct,
             "positions": aggregates,
         }
 

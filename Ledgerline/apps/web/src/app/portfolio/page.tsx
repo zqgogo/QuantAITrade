@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, PieChart, Wallet, ArrowRight } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { tradingApi, PortfolioSummary, PositionAggregate } from '@/lib/api';
+import { tradingApi, marketApi, PortfolioSummary, PositionAggregate } from '@/lib/api';
 import { formatCurrency, Currency } from '@/lib/currency';
 
 function PortfolioHeader({ summary, currency }: { summary: PortfolioSummary; currency: Currency }) {
@@ -209,7 +209,25 @@ export default function PortfolioPage() {
           tradingApi.portfolios.summary(1),
           tradingApi.portfolios.get(1),
         ]);
-        setSummary(summaryRes.data);
+
+        const summaryData = summaryRes.data;
+        const openPositions = summaryData.positions.filter(p => p.status === 'open');
+        
+        const priceMap: { [key: string]: number } = {};
+        await Promise.all(openPositions.map(async (p: PositionAggregate) => {
+          try {
+            const priceRes = await marketApi.price(p.market, p.symbol);
+            priceMap[`${p.market}:${p.symbol}`] = priceRes.data.price;
+          } catch {}
+        }));
+
+        let finalSummary = summaryData;
+        if (Object.keys(priceMap).length > 0) {
+          const priceSummaryRes = await tradingApi.portfolios.summary(1, priceMap);
+          finalSummary = priceSummaryRes.data;
+        }
+
+        setSummary(finalSummary);
         setCurrency((portfolioRes.data.currency || 'USD') as Currency);
       } catch (error) {
         console.error('Failed to fetch portfolio data:', error);

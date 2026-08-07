@@ -27,6 +27,9 @@ class TradingRepository:
     def get_workspace(self, workspace_id: int) -> Workspace | None:
         return self.db.get(Workspace, workspace_id)
 
+    def get_workspaces(self) -> Sequence[Workspace]:
+        return self.db.scalars(select(Workspace).order_by(Workspace.created_at.desc())).all()
+
     def get_workspace_by_name(self, name: str) -> Workspace | None:
         return self.db.scalar(select(Workspace).where(Workspace.name == name))
 
@@ -39,6 +42,12 @@ class TradingRepository:
 
     def get_portfolio(self, portfolio_id: int) -> Portfolio | None:
         return self.db.get(Portfolio, portfolio_id)
+
+    def get_portfolios(self, workspace_id: int | None = None) -> Sequence[Portfolio]:
+        query = select(Portfolio).order_by(Portfolio.created_at.desc())
+        if workspace_id is not None:
+            query = query.where(Portfolio.workspace_id == workspace_id)
+        return self.db.scalars(query).all()
 
     def get_portfolios_by_workspace(self, workspace_id: int) -> Sequence[Portfolio]:
         return self.db.scalars(select(Portfolio).where(Portfolio.workspace_id == workspace_id)).all()
