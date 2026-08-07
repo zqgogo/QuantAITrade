@@ -26,8 +26,8 @@ class ContextAssembler:
                     "avg_price": pos["avg_price"],
                     "current_price": pos.get("current_price") or pos["avg_price"],
                     "side": pos["side"],
-                    "pnl": pos.get("pnl", 0),
-                    "pnl_percent": pos.get("pnl_pct", 0),
+                    "pnl": pos.get("pnl") or 0,
+                    "pnl_percent": pos.get("pnl_percent") or 0,
                 })
                 total_value += float(pos.get("current_price") or pos["avg_price"]) * float(pos["total_quantity"])
             
@@ -81,8 +81,8 @@ class ContextAssembler:
         if trading_ctx["positions"]:
             context_str += "Open Positions:\n"
             for pos in trading_ctx["positions"]:
-                pnl_color = "🟢" if pos["pnl"] >= 0 else "🔴"
-                context_str += f"  - {pos['symbol']}: {pos['side']} {pos['quantity']} @ ${pos['avg_price']:.2f} (PnL: {pnl_color} ${pos['pnl']:.2f} / {pos['pnl_percent']:.2f}%)\n"
+                pnl_color = "🟢" if (pos["pnl"] or 0) >= 0 else "🔴"
+                context_str += f"  - {pos['symbol']}: {pos['side']} {pos['quantity']} @ ${pos['avg_price']:.2f} (PnL: {pnl_color} ${pos['pnl'] or 0:.2f} / {pos['pnl_percent'] or 0:.2f}%)\n"
             context_str += "\n"
         
         if trading_ctx["recent_trades"]:
