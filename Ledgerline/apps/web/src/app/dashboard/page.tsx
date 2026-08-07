@@ -59,7 +59,7 @@ function PositionCard({ position, currency }: { position: PositionAggregate; cur
           {position.status === 'open' ? 'Open' : 'Closed'}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-4 text-sm">
+      <div className="grid grid-cols-4 gap-3 text-sm">
         <div>
           <p className="text-dark-600 text-xs">Quantity</p>
           <p className="text-white font-medium">{position.total_quantity}</p>
@@ -69,9 +69,18 @@ function PositionCard({ position, currency }: { position: PositionAggregate; cur
           <p className="text-white font-medium">{formatCurrency(position.avg_price, currency)}</p>
         </div>
         <div>
+          <p className="text-dark-600 text-xs">Current</p>
+          <p className="text-white font-medium">
+            {position.current_price !== null ? formatCurrency(position.current_price, currency) : '-'}
+          </p>
+        </div>
+        <div>
           <p className="text-dark-600 text-xs">PnL</p>
           <p className={`font-medium ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-            {isProfit ? '+' : ''}{formatCurrency(position.pnl || 0, currency)} ({isProfit ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%)
+            {isProfit ? '+' : ''}{formatCurrency(position.pnl || 0, currency)}
+            {position.pnl_percent !== null && position.pnl_percent !== 0 && (
+              <span className="text-xs ml-1">({isProfit ? '+' : ''}{position.pnl_percent.toFixed(2)}%)</span>
+            )}
           </p>
         </div>
       </div>
@@ -146,6 +155,8 @@ export default function DashboardPage() {
       }
     }
     fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

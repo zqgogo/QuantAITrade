@@ -162,7 +162,7 @@ function PositionDetail({ position, currency }: { position: PositionAggregate; c
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-5 gap-4 mb-4">
         <div>
           <p className="text-xs text-dark-600">Quantity</p>
           <p className="text-white font-medium">{position.total_quantity}</p>
@@ -170,6 +170,12 @@ function PositionDetail({ position, currency }: { position: PositionAggregate; c
         <div>
           <p className="text-xs text-dark-600">Avg Price</p>
           <p className="text-white font-medium">{formatCurrency(position.avg_price, currency)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-dark-600">Current Price</p>
+          <p className={`font-medium ${position.current_price !== null && position.current_price !== 0 ? (isProfit ? 'text-green-500' : 'text-red-500') : 'text-white'}`}>
+            {position.current_price !== null ? formatCurrency(position.current_price, currency) : '-'}
+          </p>
         </div>
         <div>
           <p className="text-xs text-dark-600">Total Value</p>
@@ -236,6 +242,8 @@ export default function PortfolioPage() {
       }
     }
     fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
