@@ -1,5 +1,8 @@
+import random
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 
 from openai import AsyncOpenAI
 
@@ -68,6 +71,40 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
 class MockLlmProvider(LlmProvider):
     def __init__(self, config: LlmProviderConfig) -> None:
         self.config = config
+        self._seed = datetime.now().microsecond
+    
+    def _extract_context(self, messages: list[ChatMessage]) -> dict:
+        context = {
+            "positions_count": 0,
+            "total_value": 0.0,
+            "positions": [],
+            "raw": "",
+        }
+        for msg in messages:
+            if msg.role == "system":
+                text = msg.content
+                context["raw"] = text
+                
+                count_match = re.search(r"Open Positions:\s*(\d+)", text)
+                if count_match:
+                    context["positions_count"] = int(count_match.group(1))
+                
+                value_match = re.search(r"Total Portfolio Value:\s*\$([\d,]+\.?\d*)", text)
+                if value_match:
+                    context["total_value"] = float(value_match.group(1).replace(",", ""))
+                
+                pos_pattern = r"-\s*(\S+):\s*(\w+)\s+([\d.]+)\s*@\s*\$([\d.]+)\s*\(PnL:\s*(\S+)\s*\$([\d.]+)"
+                for m in re.finditer(pos_pattern, text):
+                    context["positions"].append({
+                        "symbol": m.group(1),
+                        "side": m.group(2),
+                        "quantity": float(m.group(3)),
+                        "avg_price": float(m.group(4)),
+                        "pnl_sign": m.group(5),
+                        "pnl": float(m.group(6)),
+                    })
+                break
+        return context
     
     async def complete(self, messages: list[ChatMessage]) -> str:
         user_message = None
@@ -79,120 +116,182 @@ class MockLlmProvider(LlmProvider):
         if not user_message:
             return "I'm ready to help with your trading analysis. What would you like to know?"
         
+        context = self._extract_context(messages)
         user_lower = user_message.lower()
         
-        if any(keyword in user_lower for keyword in ["portfolio", "持仓", "仓位"]):
-            return """📊 **Portfolio Analysis**
-
-Based on your current portfolio:
-
-**Overview:**
-- Total Value: $32,390
-- Open Positions: 1
-- Risk Level: Moderate
-
-**Recommendations:**
-1. **Diversification**: Consider adding positions in different asset classes to reduce risk
-2. **Position Sizing**: Ensure no single position exceeds 2-3% of your total capital
-3. **Stop Loss**: Set appropriate stop loss levels for all open positions
-
-Would you like me to analyze a specific position or recommend entry/exit points?
-"""
+        rng = random.Random(self._seed + len(user_message))
         
-        if any(keyword in user_lower for keyword in ["signal", "信号", "策略", "strategy", "rsi", "macd"]):
-            return """📈 **Signal Analysis**
-
-**Current Market Conditions:**
-- BTC/USDT: Recent RSI indicates oversold conditions (below 30)
-- MACD: Bullish crossover potential forming
-- Bollinger Bands: Price near lower band
-
-**Trading Signals:**
-1. 🟢 **RSI Strategy**: BUY signal detected (RSI crossed below 30)
-2. 🟡 **Bollinger Bands**: HOLD - price within bands
-3. 🟡 **MACD**: Awaiting confirmation
-
-**Risk Assessment:**
-- Volatility: Moderate
-- Confidence: 75%
-- Recommended Position Size: 2% of capital
-
-**Action Plan:**
-- Consider initiating a long position on BTC
-- Set stop loss at recent swing low
-- Target 2-3% gain before taking profits
-
-Would you like me to run additional strategies or provide more detailed analysis?
-"""
+        if any(kw in user_lower for kw in ["portfolio", "持仓", "仓位", "组合", "我的"]):
+            return self._portfolio_response(context, rng)
         
-        if any(keyword in user_lower for keyword in ["market", "市场", "行情", "price", "价格"]):
-            return """🌍 **Market Overview**
-
-**Bitcoin (BTC/USDT):**
-- Current Price: ~$60,000
-- 24h Change: +2.3% 🟢
-- Volume: High
-
-**Market Sentiment:**
-- Fear & Greed Index: 65 (Greed)
-- Institutional Activity: Increasing
-- Regulatory Environment: Stable
-
-**Key Levels:**
-- Support: $58,000 - $59,000
-- Resistance: $62,000 - $64,000
-
-**Outlook:**
-Short-term: Bullish momentum continues
-Medium-term: Watch for consolidation
-Long-term: Positive fundamentals
-
-Would you like detailed analysis on a specific asset?
-"""
+        if any(kw in user_lower for kw in ["signal", "信号", "策略", "strategy", "rsi", "macd", "指标", "indicator"]):
+            return self._signal_response(context, rng, user_lower)
         
-        if any(keyword in user_lower for keyword in ["help", "帮助", "功能", "capability"]):
-            return """👋 Welcome to Ledgerline AI Trading Assistant!
+        if any(kw in user_lower for kw in ["market", "市场", "行情", "price", "价格", "行情"]):
+            return self._market_response(context, rng)
+        
+        if any(kw in user_lower for kw in ["help", "帮助", "功能", "capability", "你好", "hi", "hello"]):
+            return self._help_response(context)
+        
+        if any(kw in user_lower for kw in ["buy", "sell", "交易", "下单", "trade", "recommend"]):
+            return self._trade_recommend_response(context, rng)
+        
+        return self._generic_response(context, rng, user_message)
+    
+    def _portfolio_response(self, ctx: dict, rng: random.Random) -> str:
+        pos_count = ctx["positions_count"]
+        total_value = ctx["total_value"]
+        positions = ctx["positions"]
+        
+        lines = [f"📊 **Portfolio Analysis**\n"]
+        lines.append(f"**Overview:**")
+        lines.append(f"- Total Value: ${total_value:,.2f}")
+        lines.append(f"- Open Positions: {pos_count}")
+        lines.append(f"- Risk Level: {'Low' if pos_count <= 1 else 'Moderate' if pos_count <= 3 else 'High'}")
+        lines.append("")
+        
+        if positions:
+            lines.append("**Position Details:**")
+            for p in positions:
+                pnl_str = f"${p['pnl']:,.2f}"
+                emoji = "🟢" if p["pnl"] >= 0 else "🔴"
+                lines.append(f"- {p['symbol']}: {p['side'].upper()} {p['quantity']} @ ${p['avg_price']:,.2f} (PnL: {emoji} {pnl_str})")
+            lines.append("")
+        
+        recs = [
+            "Consider diversifying across different asset classes to reduce concentration risk.",
+            "Ensure no single position exceeds 2-3% of your total capital.",
+            "Set appropriate stop loss levels for all open positions.",
+            "Review your risk-reward ratio before entering new trades.",
+            "Consider taking partial profits on positions with large unrealized gains.",
+        ]
+        lines.append("**Recommendations:**")
+        for r in rng.sample(recs, min(3, len(recs))):
+            lines.append(f"- {r}")
+        
+        return "\n".join(lines)
+    
+    def _signal_response(self, ctx: dict, rng: random.Random, user_lower: str) -> str:
+        symbol = "BTC/USDT"
+        for p in ctx["positions"]:
+            symbol = p["symbol"]
+            break
+        
+        indicators = []
+        if "rsi" in user_lower:
+            indicators.append(("RSI", rng.choice(["Oversold (below 30)", "Overbought (above 70)", "Neutral"]), "🟢" if rng.random() > 0.5 else "🔴"))
+        if "macd" in user_lower:
+            indicators.append(("MACD", rng.choice(["Bullish crossover forming", "Bearish crossover", "Awaiting confirmation"]), "🟡"))
+        if "bollinger" in user_lower or "band" in user_lower:
+            indicators.append(("Bollinger Bands", rng.choice(["Price near lower band", "Price near upper band", "Price within bands"]), "🟡"))
+        if not indicators:
+            indicators = [
+                ("RSI", rng.choice(["Oversold (below 30)", "Overbought (above 70)", "Neutral"]), "🟢"),
+                ("MACD", rng.choice(["Bullish crossover", "Bearish crossover", "Neutral"]), "🟡"),
+                ("Bollinger Bands", rng.choice(["Price near lower band", "Price near upper band", "Within bands"]), "🟡"),
+            ]
+        
+        lines = [f"📈 **Signal Analysis for {symbol}**\n"]
+        lines.append("**Trading Signals:**")
+        for name, desc, emoji in indicators:
+            lines.append(f"- {name}: {desc} {emoji}")
+        lines.append("")
+        lines.append(f"**Risk Assessment:**")
+        lines.append(f"- Volatility: {rng.choice(['Low', 'Moderate', 'High'])}")
+        lines.append(f"- Confidence: {rng.randint(55, 85)}%")
+        lines.append(f"- Recommended Position Size: {rng.choice(['1-2%', '2-3%', '3-5%'])} of capital")
+        
+        return "\n".join(lines)
+    
+    def _market_response(self, ctx: dict, rng: random.Random) -> str:
+        lines = ["🌍 **Market Overview**\n"]
+        
+        symbols = [p["symbol"] for p in ctx["positions"]] or ["BTC/USDT"]
+        
+        for sym in symbols[:3]:
+            price = rng.uniform(50000, 120000)
+            change = rng.uniform(-5, 5)
+            emoji = "🟢" if change >= 0 else "🔴"
+            lines.append(f"**{sym}:**")
+            lines.append(f"- Price: ~${price:,.2f}")
+            lines.append(f"- 24h Change: {change:+.2f}% {emoji}")
+            lines.append(f"- Volume: {rng.choice(['Low', 'Moderate', 'High'])}")
+            lines.append("")
+        
+        lines.append("**Key Levels:**")
+        for sym in symbols[:2]:
+            lines.append(f"- {sym}: Support ~${rng.uniform(50000, 100000):,.0f} / Resistance ~${rng.uniform(60000, 120000):,.0f}")
+        
+        return "\n".join(lines)
+    
+    def _help_response(self, ctx: dict) -> str:
+        return """👋 **Ledgerline AI Trading Assistant**
 
-**My Capabilities:**
+**Capabilities:**
 - 📊 Portfolio Analysis & Optimization
-- 📈 Signal Generation & Strategy Execution
-- 🌍 Market Insights & News Analysis
+- 📈 Signal Generation & Strategy Analysis
+- 🌍 Market Insights & Price Monitoring
 - 🎯 Trade Recommendations & Risk Assessment
-- 💡 Technical Indicator Analysis
-
-**Available Strategies:**
-- RSI (Overbought/Oversold)
-- MACD (Crossover)
-- MA Cross (Golden/Death Cross)
-- Bollinger Bands (Breakout)
-
-**Available Indicators:**
-- SMA, EMA, MACD, RSI, Bollinger Bands, Momentum, ROC
 
 **How to use:**
-- "Analyze my portfolio" - Get portfolio assessment
-- "Run RSI strategy on BTC" - Generate trading signals
-- "What's the market outlook?" - Get market analysis
+- "分析我的持仓" - Portfolio analysis with real data
+- "给我 RSI 信号" - Strategy signal generation
+- "市场行情怎么样" - Market overview
+- "帮我做交易决策" - Trade recommendations
 
-How can I assist you today?
-"""
+Note: I'm running in **Mock mode** with simulated data. Connect a real LLM (Ollama/OpenAI) for actual AI analysis."""
+    
+    def _trade_recommend_response(self, ctx: dict, rng: random.Random) -> str:
+        lines = ["🎯 **Trade Recommendation**\n"]
         
-        return """📊 **Trading Analysis**
+        symbols = [p["symbol"] for p in ctx["positions"]] or ["BTC/USDT"]
+        sym = rng.choice(symbols)
+        
+        action = rng.choice(["LONG", "SHORT", "HOLD"])
+        emoji = "🟢" if action == "LONG" else "🔴" if action == "SHORT" else "🟡"
+        
+        lines.append(f"**Recommendation:** {emoji} {action} on {sym}")
+        lines.append(f"**Confidence:** {rng.randint(60, 85)}%")
+        lines.append(f"**Suggested Position Size:** {rng.choice(['1-2%', '2-3%'])} of capital")
+        lines.append("")
+        lines.append("**Key Levels:**")
+        lines.append(f"- Entry: ~${rng.uniform(55000, 100000):,.2f}")
+        lines.append(f"- Stop Loss: ~${rng.uniform(50000, 95000):,.2f}")
+        lines.append(f"- Take Profit: ~${rng.uniform(60000, 110000):,.2f}")
+        lines.append("")
+        lines.append("⚠️ Remember: This is a simulated recommendation. Always do your own research before trading.")
+        
+        return "\n".join(lines)
+    
+    def _generic_response(self, ctx: dict, rng: random.Random, user_msg: str) -> str:
+        templates = [
+            f"""📊 **Analysis: "{user_msg[:50]}"**
 
-Thank you for your question! I'm here to help with:
+Based on your current portfolio ({ctx['positions_count']} positions, ${ctx['total_value']:,.2f} total value), here's my perspective:
 
-1. **Portfolio Analysis** - Review your open positions and P&L
-2. **Signal Generation** - Run technical analysis strategies
-3. **Market Insights** - Get current market conditions
-4. **Trade Recommendations** - Based on your strategy preferences
+The market is showing mixed signals across different timeframes. Key factors to watch:
 
-**Example queries:**
-- "Analyze my portfolio"
-- "Generate RSI signal for BTC"
-- "What's the current market sentiment?"
+1. **Short-term momentum** suggests {rng.choice(['bullish', 'bearish', 'neutral'])} bias
+2. **Volume analysis** indicates {rng.choice(['accumulation', 'distribution', 'consolidation'])}
+3. **Technical patterns** are forming {rng.choice(['continuation', 'reversal', 'breakout'])} setup
 
-Could you provide more details about what you'd like to analyze?
-"""
+Would you like me to dive deeper into a specific aspect? For example:
+- "分析我的持仓" for portfolio-specific advice
+- "跑一下 RSI 策略" for signal generation""",
+            f"""💡 **Quick Analysis**
+
+Your question touches on an important trading topic. Here are some thoughts:
+
+- Current portfolio has **{ctx['positions_count']} open positions** worth **${ctx['total_value']:,.2f}**
+- Market sentiment appears {rng.choice(['bullish', 'bearish', 'neutral'])}
+- Consider reviewing position sizes and risk exposure
+
+For more specific analysis, try asking:
+- "看看我的组合"
+- "给我一些交易建议"
+- "市场行情如何" """,
+        ]
+        return rng.choice(templates)
 
 
 def build_llm_provider(config: LlmProviderConfig) -> LlmProvider:
