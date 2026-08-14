@@ -18,13 +18,13 @@ Reports 统计功能（`get_report_stats` + `GET /api/v1/trading/reports/stats` 
 
 | # | 任务 | 状态 | 验收标准 |
 |---|------|------|---------|
-| 1 | 后端 `period` 参数校验（`Literal`） | ⬜ | 非法 period 返回 422 |
-| 2 | `realized_pnl` 扣除持仓手续费 | ⬜ | 手续费计入净盈亏 |
-| 3 | 行尾换行修复 | ⬜ | ruff / git diff 无缺换行 |
-| 4 | 测试库隔离 + Reports 测试 | ⬜ | `pytest -q` 全绿，不读写真实库 |
-| 5 | 前端错误/空态处理 | ⬜ | 请求失败有可见提示 |
-| 6 | 全量回归验证 | ⬜ | pytest + ruff + tsc 通过 |
-| 7 | 提交 | ⬜ | git status 干净 |
+| 1 | 后端 `period` 参数校验（`Literal`） | ✅ | 非法 period 返回 422 |
+| 2 | `realized_pnl` 扣除持仓手续费 | ✅ | 手续费计入净盈亏 |
+| 3 | 行尾换行修复 | ✅ | ruff / git diff 无缺换行 |
+| 4 | 测试库隔离 + Reports 测试 | ✅ | `pytest -q` 全绿，不读写真实库 |
+| 5 | 前端错误/空态处理 | ✅ | 请求失败有可见提示 |
+| 6 | 全量回归验证 | ✅ | pytest + ruff + tsc 通过 |
+| 7 | 提交 | ✅ | git status 干净 |
 
 ## 口径说明
 
@@ -50,3 +50,17 @@ cd apps/web && npx tsc --noEmit
 curl -H "X-API-Key: dev-secret-key" \
   "http://localhost:8000/api/v1/trading/reports/stats?period=year"
 ```
+
+## 已完成记录
+
+- 2026-08-14：`period` 用 `Literal["week","month","all"]` 约束，非法值返回 422；`get_report_stats` 对未知 period 抛 `ValueError`。
+- 2026-08-14：`realized_pnl` 扣除持仓全部手续费。
+- 2026-08-14：新增 `tests/conftest.py` 用临时 SQLite 隔离测试，不再污染 `var/trading.db`；修复 `test_ai_config` 依赖本地 `llm.config.json` 的问题，强制加载 demo 配置。
+- 2026-08-14：新增 `tests/test_reports_api.py` 6 个用例（空数据、开平仓净盈亏、部分减仓、未平仓排除、非法 period、响应结构）。
+- 2026-08-14：前端 Reports 页面增加错误提示与请求取消保护。
+- 2026-08-14：前端构建产物 `next-env.d.ts` / `tsconfig.tsbuildinfo` 停止跟踪，加入 `.gitignore`。
+
+## 后续 P0（独立于本项，尚未处理）
+
+- 清理后端其余 25 项 Ruff 未使用导入/f-string 问题（涉及 ai、backtesting、market、monitoring、strategies、trading/schemas）。
+- 建立 CI：`pytest` + `ruff check app tests` + `tsc` + `npm run build`。
