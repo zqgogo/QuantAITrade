@@ -74,6 +74,7 @@ export default function NotificationsPage() {
     if (selectedPortfolioId) {
       fetchNotifications();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPortfolioId]);
 
   async function fetchNotifications() {
@@ -167,7 +168,7 @@ export default function NotificationsPage() {
           <div className="bg-dark-800 rounded-xl p-12 text-center border border-dark-700">
             <Bell className="w-16 h-16 text-dark-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-white mb-2">No Notifications</h2>
-            <p className="text-dark-600">You're all caught up</p>
+            <p className="text-dark-600">You&apos;re all caught up</p>
           </div>
         )}
       </div>

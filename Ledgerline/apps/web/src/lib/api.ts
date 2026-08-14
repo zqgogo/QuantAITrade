@@ -181,8 +181,15 @@ export const aiApi = {
   chatSignal: (params: { strategy: string; symbol: string; market: string; interval: string }) => 
     api.post<ChatResponse>('/ai/chat/signal', null, { params }),
   chatPortfolio: () => api.post<ChatResponse>('/ai/chat/portfolio'),
-  context: () => api.get<any>('/ai/context'),
+  context: () => api.get<AiContext>('/ai/context'),
 };
+
+export interface AiContext {
+  positions_count: number;
+  total_value: number;
+  recent_trades_count: number;
+  watchlist_count: number;
+}
 
 export const tradingApi = {
   workspaces: {

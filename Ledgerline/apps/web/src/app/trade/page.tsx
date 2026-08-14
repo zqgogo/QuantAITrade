@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownRight, Plus, X, CheckCircle, Package, FilePlus } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { tradingApi, TradeRecordRequest, Transaction, Portfolio, PositionAggregate } from '@/lib/api';
-import { formatCurrency, Currency, getCurrencySymbol } from '@/lib/currency';
+import { formatCurrency, Currency } from '@/lib/currency';
 
 function TradeForm() {
   const [formData, setFormData] = useState<TradeRecordRequest>({
@@ -90,7 +90,6 @@ function TradeForm() {
 
   const currentPortfolio = portfolios.find(p => p.id === formData.portfolio_id);
   const currency = (currentPortfolio?.currency || 'USD') as Currency;
-  const currencySymbol = getCurrencySymbol(currency);
 
   return (
     <div className="bg-dark-800 rounded-xl p-6 border border-dark-700">

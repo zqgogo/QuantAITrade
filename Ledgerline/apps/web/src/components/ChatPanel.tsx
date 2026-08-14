@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Sparkles, Plus, Trash2, MessageSquare } from 'lucide-react';
-import { aiApi, ChatResponse, AiStatusResponse, ChatSessionResponse, ChatSessionDetail } from '@/lib/api';
+import { aiApi, AiStatusResponse, ChatSessionResponse } from '@/lib/api';
 
 interface ChatMessage {
   id: string;
@@ -24,6 +24,7 @@ export default function ChatPanel() {
   useEffect(() => {
     aiApi.status().then(res => setAiStatus(res.data)).catch(() => {});
     loadSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function ChatPanel() {
         content: m.content,
         timestamp: m.created_at,
       })));
-    } catch (e) {
+    } catch {
       setMessages([]);
     }
   }
@@ -88,7 +89,6 @@ export default function ChatPanel() {
       timestamp: new Date().toISOString(),
     };
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
     setInput('');
     setLoading(true);
 
@@ -111,8 +111,9 @@ export default function ChatPanel() {
         setActiveSessionId(response.data.session_id);
         loadSessions();
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Unknown error';
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string };
+      const msg = error?.response?.data?.detail || error?.message || 'Unknown error';
       setError(msg);
       setMessages(prev => prev.slice(0, -1));
     } finally {
