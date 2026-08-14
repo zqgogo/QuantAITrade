@@ -9,6 +9,10 @@ var/
 *.pyc
 __pycache__/
 
+# Frontend build artifacts
+next-env.d.ts
+tsconfig.tsbuildinfo
+
 # Local private config. Commit only *.demo.json files.
 config/*.json
 !config/*.demo.json
