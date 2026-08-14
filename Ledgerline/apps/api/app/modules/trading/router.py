@@ -1,6 +1,6 @@
-from datetime import datetime
 from decimal import Decimal
 import json
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -270,3 +270,10 @@ async def mark_notification_as_read(notification_id: int):
 async def mark_all_notifications_as_read(portfolio_id: int):
     repository.mark_all_notifications_as_read(portfolio_id)
     return {"status": "all_marked_as_read"}
+
+
+@router.get("/reports/stats")
+async def get_report_stats(
+    period: Literal["week", "month", "all"] = Query("week", description="week, month, or all"),
+):
+    return service.get_report_stats(period)

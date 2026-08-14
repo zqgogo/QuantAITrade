@@ -1,7 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import select
+
+from app.db.session import TradingSessionLocal
 from app.modules.trading.models import Position, Transaction, TransactionType
 from app.modules.trading.repository import TradingRepository
 
@@ -207,3 +210,86 @@ class TradingService:
         result["transactions"] = transactions
 
         return result
+
+    def get_report_stats(self, period: str = "week") -> dict[str, Any]:
+        db = TradingSessionLocal()
+        try:
+            now = datetime.utcnow()
+            if period == "week":
+                start = now - timedelta(days=now.weekday())
+                start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif period == "month":
+                start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            elif period == "all":
+                start = datetime.min
+            else:
+                raise ValueError(f"Unsupported report period: {period}")
+
+            stmt = (
+                select(Transaction)
+                .where(Transaction.executed_at >= start)
+                .order_by(Transaction.executed_at)
+            )
+            transactions = db.execute(stmt).scalars().all()
+
+            total_buy = Decimal(0)
+            total_sell = Decimal(0)
+            total_fee = Decimal(0)
+            realized_pnl = Decimal(0)
+
+            daily: dict[str, dict[str, Any]] = {}
+
+            for t in transactions:
+                day = t.executed_at.strftime("%Y-%m-%d")
+                if day not in daily:
+                    daily[day] = {"date": day, "trades": 0, "buy": 0.0, "sell": 0.0, "fee": 0.0}
+                daily[day]["trades"] += 1
+                daily[day]["fee"] += float(t.fee)
+                total_fee += t.fee
+
+                amount = t.price * t.quantity
+                if t.type in (TransactionType.OPEN, TransactionType.ADD):
+                    total_buy += amount
+                    daily[day]["buy"] += float(amount)
+                else:
+                    total_sell += amount
+                    daily[day]["sell"] += float(amount)
+
+            closed_positions = db.execute(
+                select(Position).where(Position.status == "closed")
+            ).scalars().all()
+            for pos in closed_positions:
+                pos_tx = db.execute(
+                    select(Transaction).where(Transaction.position_id == pos.id).order_by(Transaction.executed_at)
+                ).scalars().all()
+                buys = [t for t in pos_tx if t.type in (TransactionType.OPEN, TransactionType.ADD)]
+                sells = [t for t in pos_tx if t.type in (TransactionType.REDUCE, TransactionType.CLOSE)]
+                buy_cost = sum(t.price * t.quantity for t in buys)
+                sell_revenue = sum(t.price * t.quantity for t in sells)
+                position_fee = sum(t.fee for t in pos_tx)
+                pnl = sell_revenue - buy_cost - position_fee
+                if pnl != 0:
+                    close_day = pos.closed_at.strftime("%Y-%m-%d") if pos.closed_at else None
+                    if close_day and (period == "all" or close_day >= start.strftime("%Y-%m-%d")):
+                        realized_pnl += pnl
+                        if close_day in daily:
+                            daily[close_day]["pnl"] = daily[close_day].get("pnl", 0.0) + float(pnl)
+
+            daily_list = sorted(daily.values(), key=lambda d: d["date"])
+            for d in daily_list:
+                d.setdefault("pnl", 0.0)
+
+            return {
+                "period": period,
+                "start_date": start.date().isoformat(),
+                "end_date": now.date().isoformat(),
+                "total_trades": len(transactions),
+                "total_buy": float(total_buy),
+                "total_sell": float(total_sell),
+                "total_fee": float(total_fee),
+                "realized_pnl": float(realized_pnl),
+                "net_volume": float(total_sell - total_buy),
+                "daily": daily_list,
+            }
+        finally:
+            db.close()
