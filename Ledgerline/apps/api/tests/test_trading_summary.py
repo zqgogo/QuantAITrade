@@ -89,3 +89,128 @@ def test_summary_without_current_price_uses_avg(client: TestClient) -> None:
     pos = resp.json()["positions"][0]
     assert pos["current_price"] is None
     assert pos["pnl"] is None
+
+
+def test_summary_aggregates_total_fee(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+    _record(client, portfolio_id, type="open", price=100, quantity=2, fee=1.5)
+    _record(client, portfolio_id, type="add", price=110, quantity=1, fee=0.5)
+
+    data = _summary(client, portfolio_id, current_price=105)
+    assert data["positions"][0]["total_fee"] == pytest.approx(2.0)
+    assert data["positions"][0]["total_amount"] == pytest.approx(310)
+
+
+def test_reduce_exceeding_quantity_rejected(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+    _record(client, portfolio_id, type="open", price=100, quantity=2)
+
+    resp = client.post(
+        "/api/v1/trading/transactions",
+        json={
+            "portfolio_id": portfolio_id,
+            "market": "crypto",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "type": "reduce",
+            "price": 120,
+            "quantity": 3,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400
+    assert "quantity" in resp.json()["detail"].lower()
+
+
+def test_close_exceeding_quantity_rejected(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+    _record(client, portfolio_id, type="open", price=100, quantity=2)
+
+    resp = client.post(
+        "/api/v1/trading/transactions",
+        json={
+            "portfolio_id": portfolio_id,
+            "market": "crypto",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "type": "close",
+            "price": 120,
+            "quantity": 5,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400
+
+
+def test_partial_reduce_then_close(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+    _record(client, portfolio_id, type="open", price=100, quantity=3)
+    _record(client, portfolio_id, type="reduce", price=110, quantity=1)
+
+    resp = client.post(
+        "/api/v1/trading/transactions",
+        json={
+            "portfolio_id": portfolio_id,
+            "market": "crypto",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "type": "close",
+            "price": 120,
+            "quantity": 2,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    data = _summary(client, portfolio_id, current_price=120)
+    assert data["positions"] == []
+
+
+def test_reduce_without_open_position_rejected(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+
+    resp = client.post(
+        "/api/v1/trading/transactions",
+        json={
+            "portfolio_id": portfolio_id,
+            "market": "crypto",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "type": "close",
+            "price": 120,
+            "quantity": 1,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400
+
+
+def test_non_positive_quantity_rejected(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+
+    resp = client.post(
+        "/api/v1/trading/transactions",
+        json={
+            "portfolio_id": portfolio_id,
+            "market": "crypto",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "type": "open",
+            "price": 100,
+            "quantity": 0,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400
+
+
+def test_transaction_list_returns_real_fee(client: TestClient) -> None:
+    portfolio_id = _seed_portfolio(client)
+    _record(client, portfolio_id, type="open", price=100, quantity=2, fee=1.5)
+
+    resp = client.get(
+        "/api/v1/trading/transactions",
+        params={"portfolio_id": portfolio_id},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    assert resp.json()[0]["fee"] == pytest.approx(1.5)

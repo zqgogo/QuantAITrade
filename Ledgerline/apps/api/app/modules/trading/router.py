@@ -110,18 +110,21 @@ async def record_transaction(data: TransactionCreate):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
 
-    result = service.record_transaction(
-        portfolio_id=data.portfolio_id,
-        market=data.market,
-        symbol=data.symbol,
-        side=data.side,
-        type=transaction_type,
-        price=Decimal(str(data.price)),
-        quantity=Decimal(str(data.quantity)),
-        fee=Decimal(str(data.fee)),
-        executed_at=data.executed_at,
-        note=data.note,
-    )
+    try:
+        result = service.record_transaction(
+            portfolio_id=data.portfolio_id,
+            market=data.market,
+            symbol=data.symbol,
+            side=data.side,
+            type=transaction_type,
+            price=Decimal(str(data.price)),
+            quantity=Decimal(str(data.quantity)),
+            fee=Decimal(str(data.fee)),
+            executed_at=data.executed_at,
+            note=data.note,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return result
 
 
@@ -140,7 +143,7 @@ async def list_transactions(portfolio_id: int | None = None):
             "quantity": float(t.quantity),
             "price": float(t.price),
             "amount": float(t.price * t.quantity),
-            "fee": 0,
+            "fee": float(t.fee),
             "created_at": t.created_at.isoformat(),
         }
         for t in transactions

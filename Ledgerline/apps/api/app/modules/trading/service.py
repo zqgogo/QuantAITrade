@@ -31,6 +31,7 @@ class PositionAggregate:
 
         self.total_quantity = total_buy_quantity - total_sell_quantity
         self.avg_price = total_buy_value / total_buy_quantity if total_buy_quantity > 0 else Decimal(0)
+        self.total_fee = sum(t.fee for t in self.transactions)
 
     def to_dict(self, current_price: Decimal | None = None) -> dict[str, Any]:
         base = {
@@ -44,6 +45,7 @@ class PositionAggregate:
             "closed_at": self.position.closed_at.isoformat() if self.position.closed_at else None,
             "total_quantity": float(self.total_quantity),
             "avg_price": float(self.avg_price),
+            "total_fee": float(self.total_fee),
         }
 
         if current_price is not None:
@@ -95,6 +97,11 @@ class TradingService:
     ) -> dict[str, Any]:
         if executed_at is None:
             executed_at = datetime.utcnow()
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than zero")
+        if price <= 0:
+            raise ValueError("Price must be greater than zero")
+
         open_positions = self.repository.get_open_positions(portfolio_id)
         position = None
 
@@ -105,6 +112,14 @@ class TradingService:
 
         if not position and type != TransactionType.OPEN:
             raise ValueError("No open position found for this symbol and side")
+
+        if type in (TransactionType.REDUCE, TransactionType.CLOSE) and position:
+            txns = self.repository.get_transactions_by_position(position.id)
+            agg = PositionAggregate(position, txns)
+            if quantity > agg.total_quantity:
+                raise ValueError(
+                    f"Cannot {type.value} more than current position quantity: {agg.total_quantity}"
+                )
 
         if not position:
             position = self.repository.create_position(
@@ -163,7 +178,6 @@ class TradingService:
 
             agg_dict = agg.to_dict(current_price)
             agg_dict["total_amount"] = float(agg.total_quantity * agg.avg_price)
-            agg_dict["total_fee"] = 0
             aggregates.append(agg_dict)
 
             total_value += agg.total_quantity * (current_price if current_price else agg.avg_price)
