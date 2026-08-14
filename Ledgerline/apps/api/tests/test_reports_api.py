@@ -1,9 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db.session import TradingSessionLocal
 from app.main import app
-from app.modules.trading.models import Position, Portfolio, Transaction, Workspace
 
 HEADERS = {"X-API-Key": "dev-secret-key"}
 
@@ -12,20 +10,6 @@ HEADERS = {"X-API-Key": "dev-secret-key"}
 def client():
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture(autouse=True)
-def _clean_db():
-    yield
-    db = TradingSessionLocal()
-    try:
-        db.execute(Transaction.__table__.delete())
-        db.execute(Position.__table__.delete())
-        db.execute(Portfolio.__table__.delete())
-        db.execute(Workspace.__table__.delete())
-        db.commit()
-    finally:
-        db.close()
 
 
 def _seed_portfolio(client: TestClient) -> int:

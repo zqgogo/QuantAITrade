@@ -47,7 +47,7 @@ class PositionAggregate:
         }
 
         if current_price is not None:
-            if self.position.side == "long":
+            if self.position.side == "buy":
                 pnl = (current_price - self.avg_price) * self.total_quantity
                 pnl_pct = ((current_price - self.avg_price) / self.avg_price * 100) if self.avg_price > 0 else Decimal(0)
             else:
@@ -168,7 +168,7 @@ class TradingService:
 
             total_value += agg.total_quantity * (current_price if current_price else agg.avg_price)
             if current_price is not None:
-                if pos.side == "long":
+                if pos.side == "buy":
                     pnl = (current_price - agg.avg_price) * agg.total_quantity
                 else:
                     pnl = (agg.avg_price - current_price) * agg.total_quantity

@@ -196,22 +196,17 @@ export const tradingApi = {
     list: () => api.get<Workspace[]>('/trading/workspaces'),
     create: (data: { name: string; description?: string }) => api.post<Workspace>('/trading/workspaces', data),
     get: (id: number) => api.get<Workspace>(`/trading/workspaces/${id}`),
-    update: (id: number, data: { name?: string; description?: string }) => api.put<Workspace>(`/trading/workspaces/${id}`, data),
-    delete: (id: number) => api.delete(`/trading/workspaces/${id}`),
   },
   portfolios: {
     list: (workspaceId?: number) => api.get<Portfolio[]>('/trading/portfolios', { params: { workspace_id: workspaceId } }),
     create: (data: { workspace_id: number; name: string; description?: string }) => api.post<Portfolio>('/trading/portfolios', data),
     get: (id: number) => api.get<Portfolio>(`/trading/portfolios/${id}`),
-    update: (id: number, data: { name?: string; description?: string }) => api.put<Portfolio>(`/trading/portfolios/${id}`, data),
-    delete: (id: number) => api.delete(`/trading/portfolios/${id}`),
     summary: (id: number, currentPrices?: { [key: string]: number }) => 
       api.get<PortfolioSummary>(`/trading/portfolios/${id}/summary`, { params: { current_prices: JSON.stringify(currentPrices || {}) } }),
   },
   transactions: {
     list: (portfolioId?: number) => api.get<Transaction[]>('/trading/transactions', { params: { portfolio_id: portfolioId } }),
     record: (data: TradeRecordRequest) => api.post<Transaction>('/trading/transactions', data),
-    get: (id: number) => api.get<Transaction>(`/trading/transactions/${id}`),
   },
   positions: {
     get: (id: number, currentPrice?: number) => 
