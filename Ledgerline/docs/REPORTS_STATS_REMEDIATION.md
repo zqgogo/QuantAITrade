@@ -60,7 +60,8 @@ curl -H "X-API-Key: dev-secret-key" \
 - 2026-08-14：前端 Reports 页面增加错误提示与请求取消保护。
 - 2026-08-14：前端构建产物 `next-env.d.ts` / `tsconfig.tsbuildinfo` 停止跟踪，加入 `.gitignore`。
 
-## 后续 P0（独立于本项，尚未处理）
+## 后续 P0（独立于本项）
 
-- 清理后端其余 25 项 Ruff 未使用导入/f-string 问题（涉及 ai、backtesting、market、monitoring、strategies、trading/schemas）。
-- 建立 CI：`pytest` + `ruff check app tests` + `tsc` + `npm run build`。
+- 2026-08-14 ✅ 清理后端全部 Ruff 未使用导入/f-string（ai、backtesting、market、monitoring、strategies、trading/schemas），`ruff check app tests` 全绿；顺手修复 `chat_signal` 端点 signal prompt 被丢弃的真实 bug。
+- 2026-08-14 ✅ 补齐前端 ESLint flat config（`eslint.config.mjs`），修复 lint 全部 errors/warnings，`npm run lint` 全绿。
+- 2026-08-14 ✅ 建立 GitHub Actions CI（`.github/workflows/ci.yml`）：后端 pytest + ruff，前端 lint + tsc + build。
