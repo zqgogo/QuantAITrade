@@ -68,8 +68,8 @@ npm run dev
 
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
-| 3.1 | 记录开仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "open", "price": 100000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-01T00:00:00", "note": "开仓测试"}` | 返回交易记录，自动创建持仓 |
-| 3.2 | 记录加仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "long", "type": "add", "price": 105000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-02T00:00:00"}` | 返回交易记录，持仓数量增加 |
+| 3.1 | 记录开仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "buy", "type": "open", "price": 100000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-01T00:00:00", "note": "开仓测试"}` | 返回交易记录，自动创建持仓 |
+| 3.2 | 记录加仓交易 | POST `/api/v1/trading/transactions`<br>Body: `{"portfolio_id": 1, "market": "crypto", "symbol": "BTCUSDT", "side": "buy", "type": "add", "price": 105000, "quantity": 0.1, "fee": 0, "executed_at": "2024-01-02T00:00:00"}` | 返回交易记录，持仓数量增加 |
 | 3.3 | 查询交易列表 | GET `/api/v1/trading/transactions` | 返回交易列表 |
 | 3.4 | 查询指定组合交易 | GET `/api/v1/trading/transactions?portfolio_id=1` | 返回指定组合的交易列表 |
 
@@ -97,6 +97,15 @@ npm run dev
 | 6.2 | 查询指定状态通知 | GET `/api/v1/trading/portfolios/{portfolio_id}/notifications?status=unread` | 返回未读通知列表 |
 | 6.3 | 标记单条已读 | PUT `/api/v1/trading/notifications/{notification_id}/read` | 返回 `{"status": "marked_as_read"}` |
 | 6.4 | 标记全部已读 | PUT `/api/v1/trading/portfolios/{portfolio_id}/notifications/read-all` | 返回 `{"status": "all_marked_as_read"}` |
+
+### 7. 报表统计
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 7.1 | 获取本周统计 | GET `/api/v1/trading/reports/stats?period=week` | 返回 total_trades、total_buy、total_sell、total_fee、realized_pnl、net_volume、daily |
+| 7.2 | 获取本月统计 | GET `/api/v1/trading/reports/stats?period=month` | 返回月度统计 |
+| 7.3 | 获取全部统计 | GET `/api/v1/trading/reports/stats?period=all` | 返回全量统计 |
+| 7.4 | 非法 period | GET `/api/v1/trading/reports/stats?period=year` | 返回 422 |
 
 ---
 
@@ -249,6 +258,16 @@ npm run dev
 | 测试步骤 | 操作 | 预期结果 | 状态 |
 |---------|------|---------|------|
 | 3.1 | 获取上下文摘要 | GET `/api/v1/ai/context` | 返回 ContextSummary，包含 positions_count、total_value、recent_trades_count、watchlist_count |
+
+### 4. 聊天会话
+
+| 测试步骤 | 操作 | 预期结果 | 状态 |
+|---------|------|---------|------|
+| 4.1 | 创建会话 | POST `/api/v1/ai/sessions`<br>Body: `{"title": "BTC 分析"}` | 返回会话对象，包含 id 和 message_count=0 |
+| 4.2 | 列出会话 | GET `/api/v1/ai/sessions` | 返回 `{"sessions": [...]}`，按更新时间倒序 |
+| 4.3 | 获取会话详情 | GET `/api/v1/ai/sessions/{session_id}` | 返回会话及消息列表 |
+| 4.4 | 删除会话 | DELETE `/api/v1/ai/sessions/{session_id}` | 返回 `{"ok": true}` |
+| 4.5 | 会话续聊 | POST `/api/v1/ai/chat`<br>Body: `{"message": "继续", "session_id": 1}` | 返回 ChatResponse，包含 session_id |
 
 ---
 

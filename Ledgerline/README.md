@@ -98,10 +98,16 @@ For production, set the `LEDGERLINE_API_KEY` environment variable.
 | `/api/v1/trading/workspaces/{id}` | GET | Get workspace detail |
 | `/api/v1/trading/portfolios` | POST/GET | Create/List portfolios |
 | `/api/v1/trading/portfolios/{id}` | GET | Get portfolio detail |
-| `/api/v1/trading/portfolios/{id}/summary` | GET | Get portfolio summary |
-| `/api/v1/trading/transactions` | POST/GET | Create/List transactions |
+| `/api/v1/trading/portfolios/{id}/summary` | GET | Get portfolio summary (positions + P&L) |
+| `/api/v1/trading/transactions` | POST/GET | Record/List transactions |
 | `/api/v1/trading/positions/{id}` | GET | Get position detail |
 | `/api/v1/trading/watchlist` | POST | Add to watchlist |
+| `/api/v1/trading/watchlist/{id}` | PUT/DELETE | Update/Delete watchlist item |
+| `/api/v1/trading/portfolios/{id}/watchlist` | GET | List watchlist items |
+| `/api/v1/trading/portfolios/{id}/notifications` | GET | List notifications |
+| `/api/v1/trading/notifications/{id}/read` | PUT | Mark notification read |
+| `/api/v1/trading/portfolios/{id}/notifications/read-all` | PUT | Mark all notifications read |
+| `/api/v1/trading/reports/stats` | GET | Report stats (period=week/month/all) |
 
 ### Market Module
 
@@ -109,27 +115,33 @@ For production, set the `LEDGERLINE_API_KEY` environment variable.
 | --- | --- | --- |
 | `/api/v1/market/ohlcv` | GET | Get OHLCV data |
 | `/api/v1/market/ohlcv/refresh` | POST | Refresh OHLCV data |
-| `/api/v1/market/symbols` | GET | Get available symbols |
-| `/api/v1/market/price/{symbol}` | GET | Get current price |
+| `/api/v1/market/price` | GET | Get current price (`?market=...&symbol=...`) |
+| `/api/v1/market/progress` | GET | Data download progress |
+| `/api/v1/market/status` | GET | Market module status |
 
 ### Indicators Module
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/api/v1/indicators/sma` | POST | Calculate SMA |
-| `/api/v1/indicators/ema` | POST | Calculate EMA |
-| `/api/v1/indicators/macd` | POST | Calculate MACD |
-| `/api/v1/indicators/rsi` | POST | Calculate RSI |
-| `/api/v1/indicators/bollinger` | POST | Calculate Bollinger Bands |
-| `/api/v1/indicators/all` | POST | Calculate all indicators |
+| `/api/v1/indicators/available` | GET | List available indicators |
+| `/api/v1/indicators/sma` | GET | Calculate SMA |
+| `/api/v1/indicators/ema` | GET | Calculate EMA |
+| `/api/v1/indicators/macd` | GET | Calculate MACD |
+| `/api/v1/indicators/rsi` | GET | Calculate RSI |
+| `/api/v1/indicators/bollinger` | GET | Calculate Bollinger Bands |
+| `/api/v1/indicators/momentum` | GET | Calculate Momentum |
+| `/api/v1/indicators/roc` | GET | Calculate ROC |
+| `/api/v1/indicators/volume-ma` | GET | Calculate Volume MA |
+| `/api/v1/indicators/calculate` | GET | Generic indicator calculation |
 
 ### Strategies Module
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/api/v1/strategies/list` | GET | List available strategies |
-| `/api/v1/strategies/{name}/signal` | POST | Get strategy signal |
-| `/api/v1/strategies/consensus` | POST | Multi-strategy consensus |
+| `/api/v1/strategies/available` | GET | List available strategies |
+| `/api/v1/strategies/run` | POST | Run strategy (query params) |
+| `/api/v1/strategies/run/{name}` | GET | Run strategy by name |
+| `/api/v1/strategies/run/multiple` | POST | Multi-strategy run |
 
 ### Backtesting Module
 
@@ -139,14 +151,23 @@ For production, set the `LEDGERLINE_API_KEY` environment variable.
 | `/api/v1/backtesting/quick-run` | POST | Quick backtest |
 | `/api/v1/backtesting/run/multiple` | POST | Multi-strategy backtest |
 | `/api/v1/backtesting/strategies` | GET | List available strategies |
+| `/api/v1/backtesting/results` | GET | Recent backtest results |
 
 ### Monitoring Module
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
 | `/api/v1/monitoring/alerts/price` | POST | Create price alert |
+| `/api/v1/monitoring/alerts/signal` | POST | Create signal alert |
 | `/api/v1/monitoring/alerts/rules` | GET | List alert rules |
+| `/api/v1/monitoring/alerts/rules/{id}` | GET/DELETE | Get/Delete alert rule |
+| `/api/v1/monitoring/alerts/rules/{id}/toggle` | PATCH | Enable/Disable alert rule |
 | `/api/v1/monitoring/alerts/notifications` | GET | List alert notifications |
+| `/api/v1/monitoring/alerts/notifications/{id}/read` | PATCH | Mark notification read |
+| `/api/v1/monitoring/alerts/notifications/read-all` | PATCH | Mark all notifications read |
+| `/api/v1/monitoring/monitor/start` | POST | Start price monitor |
+| `/api/v1/monitoring/monitor/stop` | POST | Stop price monitor |
+| `/api/v1/monitoring/monitor/symbols` | GET | List monitored symbols |
 | `/api/v1/monitoring/price/current` | GET | Get current price |
 | `/api/v1/monitoring/ws` | WS | WebSocket for real-time updates |
 
@@ -154,18 +175,29 @@ For production, set the `LEDGERLINE_API_KEY` environment variable.
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/api/v1/ai/chat` | POST | AI chat |
+| `/api/v1/ai/chat` | POST | AI chat (auto-creates session) |
+| `/api/v1/ai/chat/portfolio` | POST | Portfolio analysis |
+| `/api/v1/ai/chat/signal` | POST | Strategy signal analysis |
 | `/api/v1/ai/status` | GET | AI service status |
 | `/api/v1/ai/context` | GET | Get AI context |
+| `/api/v1/ai/sessions` | GET/POST | List/Create chat sessions |
+| `/api/v1/ai/sessions/{id}` | GET/DELETE | Get/Delete chat session |
 
 ## Usage Examples
 
-### 1. Create a Portfolio
+### 1. Create a Workspace and Portfolio
 
 ```bash
+# Create a workspace
 curl -X POST -H "X-API-Key: dev-secret-key" \
   -H "Content-Type: application/json" \
-  -d '{"name": "My Portfolio", "description": "Main trading portfolio"}' \
+  -d '{"name": "Trading"}' \
+  http://localhost:8000/api/v1/trading/workspaces
+
+# Create a portfolio inside the workspace
+curl -X POST -H "X-API-Key: dev-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"workspace_id": 1, "name": "My Portfolio", "currency": "USD"}' \
   http://localhost:8000/api/v1/trading/portfolios
 ```
 
@@ -177,46 +209,44 @@ curl -X POST -H "X-API-Key: dev-secret-key" \
   -d '{
     "portfolio_id": 1,
     "market": "crypto",
-    "symbol": "BTC/USDT",
-    "action": "open",
-    "type": "buy",
-    "quantity": 0.1,
+    "symbol": "BTCUSDT",
+    "side": "buy",
+    "type": "open",
     "price": 60000,
-    "amount": 6000
+    "quantity": 0.1,
+    "fee": 0
   }' \
   http://localhost:8000/api/v1/trading/transactions
 ```
+
+`type` is one of `open`/`add`/`reduce`/`close`; `side` is `buy`/`sell`.
 
 ### 3. Get Market Data
 
 ```bash
 curl -H "X-API-Key: dev-secret-key" \
-  "http://localhost:8000/api/v1/market/ohlcv?market=crypto&symbol=BTC/USDT&interval=1d&limit=30"
+  "http://localhost:8000/api/v1/market/ohlcv?market=crypto&symbol=BTCUSDT&interval=1d&limit=30"
 ```
 
 ### 4. Calculate RSI
 
 ```bash
-curl -X POST -H "X-API-Key: dev-secret-key" \
-  -H "Content-Type: application/json" \
-  -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d", "period": 14}' \
-  http://localhost:8000/api/v1/indicators/rsi
+curl -H "X-API-Key: dev-secret-key" \
+  "http://localhost:8000/api/v1/indicators/rsi?market=crypto&symbol=BTCUSDT&interval=1d&period=14"
 ```
 
 ### 5. Get Strategy Signal
 
 ```bash
 curl -X POST -H "X-API-Key: dev-secret-key" \
-  -H "Content-Type: application/json" \
-  -d '{"market": "crypto", "symbol": "BTC/USDT", "interval": "1d"}' \
-  http://localhost:8000/api/v1/strategies/rsi/signal
+  "http://localhost:8000/api/v1/strategies/run?market=crypto&symbol=BTCUSDT&interval=1d&strategy=rsi"
 ```
 
 ### 6. Run Backtest
 
 ```bash
 curl -X POST -H "X-API-Key: dev-secret-key" \
-  "http://localhost:8000/api/v1/backtesting/quick-run?strategy=rsi&market=crypto&symbol=BTC/USDT&interval=1d&initial_capital=10000"
+  "http://localhost:8000/api/v1/backtesting/quick-run?strategy=rsi&market=crypto&symbol=BTCUSDT&interval=1d&initial_capital=10000"
 ```
 
 ### 7. AI Chat
