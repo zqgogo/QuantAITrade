@@ -4,6 +4,7 @@ import tempfile
 import pytest
 
 from app.db.session import TradingSessionLocal
+from app.modules.monitoring.models import AlertNotificationRecord, AlertRuleRecord
 from app.modules.trading.models import Position, Portfolio, Transaction, Workspace
 
 _test_dir = tempfile.mkdtemp(prefix="ledgerline_test_")
@@ -17,6 +18,8 @@ def _clean_db():
     yield
     db = TradingSessionLocal()
     try:
+        db.execute(AlertNotificationRecord.__table__.delete())
+        db.execute(AlertRuleRecord.__table__.delete())
         db.execute(Transaction.__table__.delete())
         db.execute(Position.__table__.delete())
         db.execute(Portfolio.__table__.delete())
