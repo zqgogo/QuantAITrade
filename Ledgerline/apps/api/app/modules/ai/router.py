@@ -199,11 +199,10 @@ async def chat_signal(
     interval: str = Query(description="Time interval"),
 ) -> ChatResponse:
     from app.modules.ai.prompt_builder import prompt_builder
-    from app.modules.ai.providers import ChatMessage
 
     messages = prompt_builder.build_signal_prompt(strategy, symbol, market, interval)
     agent_request = AgentRequest(
-        user_message=f"Analyze {strategy} signal for {symbol}",
+        user_message=messages[-1]["content"],
         include_context=True,
     )
 

@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
-from app.modules.market.exchange_connector import OhlcvBar, create_connector
+from app.modules.market.exchange_connector import create_connector
 from app.modules.market.repository import OhlcvRepository
 from app.modules.market.schemas import (
     DataProgressResponse,

@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
-from app.core.ai_config import AgentConfig, AiConfig, load_ai_config
+from app.core.ai_config import AgentConfig, load_ai_config
 from app.modules.ai.prompt_builder import prompt_builder
 
 

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.modules.strategies.schemas import (
     AvailableStrategiesResponse,

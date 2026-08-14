@@ -4,7 +4,6 @@ from app.modules.market.repository import OhlcvRepository
 from app.modules.strategies.schemas import (
     AvailableStrategiesResponse,
     MultiStrategyRunResponse,
-    Signal,
     StrategyInfo,
     StrategyRunResponse,
 )

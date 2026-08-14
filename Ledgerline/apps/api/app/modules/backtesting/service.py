@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from app.modules.backtesting.engine import BacktestEngine, PerformanceCalculator
 from app.modules.backtesting.schemas import BacktestRequest, BacktestResult

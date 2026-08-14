@@ -143,8 +143,8 @@ class MockLlmProvider(LlmProvider):
         total_value = ctx["total_value"]
         positions = ctx["positions"]
         
-        lines = [f"📊 **Portfolio Analysis**\n"]
-        lines.append(f"**Overview:**")
+        lines = ["📊 **Portfolio Analysis**\n"]
+        lines.append("**Overview:**")
         lines.append(f"- Total Value: ${total_value:,.2f}")
         lines.append(f"- Open Positions: {pos_count}")
         lines.append(f"- Risk Level: {'Low' if pos_count <= 1 else 'Moderate' if pos_count <= 3 else 'High'}")
@@ -196,7 +196,7 @@ class MockLlmProvider(LlmProvider):
         for name, desc, emoji in indicators:
             lines.append(f"- {name}: {desc} {emoji}")
         lines.append("")
-        lines.append(f"**Risk Assessment:**")
+        lines.append("**Risk Assessment:**")
         lines.append(f"- Volatility: {rng.choice(['Low', 'Moderate', 'High'])}")
         lines.append(f"- Confidence: {rng.randint(55, 85)}%")
         lines.append(f"- Recommended Position Size: {rng.choice(['1-2%', '2-3%', '3-5%'])} of capital")

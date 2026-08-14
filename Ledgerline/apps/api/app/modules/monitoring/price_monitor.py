@@ -5,7 +5,6 @@ from typing import Dict
 from app.modules.market.repository import OhlcvRepository
 from app.modules.monitoring.alert_manager import alert_manager
 from app.modules.monitoring.schemas import (
-    AlertSeverity,
     AlertType,
     PriceUpdate,
 )

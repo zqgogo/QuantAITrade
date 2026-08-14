@@ -1,8 +1,8 @@
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Body, Query
 
-from app.modules.backtesting.schemas import BacktestRequest, BacktestResult, BacktestSummary, BacktestListResponse
+from app.modules.backtesting.schemas import BacktestRequest, BacktestResult, BacktestListResponse
 from app.modules.backtesting.service import backtest_service
 from app.modules.strategies.strategies import StrategyRegistry
 
