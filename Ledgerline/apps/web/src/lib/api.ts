@@ -221,7 +221,33 @@ export const tradingApi = {
     markRead: (id: number) => api.put(`/trading/notifications/${id}/read`),
     markAllRead: (portfolioId: number) => api.put(`/trading/portfolios/${portfolioId}/notifications/read-all`),
   },
+  reports: {
+    stats: (period: 'week' | 'month' | 'all') =>
+      api.get<ReportStatsResponse>('/trading/reports/stats', { params: { period } }),
+  },
 };
+
+export interface DailyReportRow {
+  date: string;
+  trades: number;
+  buy: number;
+  sell: number;
+  fee: number;
+  pnl: number;
+}
+
+export interface ReportStatsResponse {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_trades: number;
+  total_buy: number;
+  total_sell: number;
+  total_fee: number;
+  realized_pnl: number;
+  net_volume: number;
+  daily: DailyReportRow[];
+}
 
 export const marketApi = {
   price: (market: string, symbol: string) => api.get<{ market: string; symbol: string; price: number; timestamp: string }>('/market/price', { params: { market, symbol } }),
