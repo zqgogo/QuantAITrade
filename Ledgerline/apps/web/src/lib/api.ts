@@ -72,6 +72,7 @@ export interface PositionAggregate {
   avg_price: number;
   total_amount: number;
   total_fee: number;
+  currency: string;
   current_price: number | null;
   pnl: number | null;
   pnl_percent: number | null;
@@ -82,6 +83,7 @@ export interface PositionAggregate {
 export interface PortfolioSummary {
   portfolio_id: number;
   portfolio_name: string;
+  currency: string;
   total_pnl: number;
   total_pnl_percent: number;
   total_value: number;

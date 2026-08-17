@@ -65,9 +65,38 @@ class PositionAggregate:
         return base
 
 
+QUOTE_CURRENCIES = ("USDT", "USDC", "USD", "CNYT", "CNY", "EUR", "JPY", "AUD", "HKD", "GBP")
+
+
+def quote_currency_from_symbol(symbol: str) -> str:
+    normalized = symbol.upper().replace("/", "")
+    for quote in QUOTE_CURRENCIES:
+        if normalized.endswith(quote):
+            if quote in ("USDT", "USDC"):
+                return "USD"
+            return quote
+    return "USD"
+
+
 class TradingService:
     def __init__(self, repository: TradingRepository | None = None):
         self.repository = repository or TradingRepository()
+
+    def convert_amount(
+        self,
+        amount: Decimal,
+        from_currency: str,
+        to_currency: str,
+    ) -> Decimal | None:
+        if from_currency == to_currency or amount == 0:
+            return amount
+        rate = self.repository.get_fx_rate(from_currency, to_currency)
+        if rate:
+            return amount * rate.rate
+        inverse = self.repository.get_fx_rate(to_currency, from_currency)
+        if inverse and inverse.rate > 0:
+            return amount / inverse.rate
+        return None
 
     def ensure_default_workspace(self) -> int:
         workspace = self.repository.get_workspace_by_name("Trading")
@@ -160,6 +189,7 @@ class TradingService:
 
     def get_portfolio_summary(self, portfolio_id: int, current_prices: dict[str, float] | None = None) -> dict[str, Any]:
         portfolio = self.repository.get_portfolio(portfolio_id)
+        base_currency = portfolio.currency if portfolio else "USD"
         open_positions = self.repository.get_open_positions(portfolio_id)
         aggregates = []
         total_value = Decimal(0)
@@ -176,26 +206,38 @@ class TradingService:
                 elif pos.symbol in current_prices:
                     current_price = Decimal(str(current_prices[pos.symbol]))
 
+            quote_currency = quote_currency_from_symbol(pos.symbol)
+            total_amount = agg.total_quantity * agg.avg_price
+            converted_amount = self.convert_amount(total_amount, quote_currency, base_currency)
+            if converted_amount is None:
+                converted_amount = total_amount
+
             agg_dict = agg.to_dict(current_price)
-            agg_dict["total_amount"] = float(agg.total_quantity * agg.avg_price)
+            agg_dict["total_amount"] = float(converted_amount)
+            agg_dict["currency"] = base_currency
             aggregates.append(agg_dict)
 
-            total_value += agg.total_quantity * (current_price if current_price else agg.avg_price)
+            total_value += converted_amount
             if current_price is not None:
                 if pos.side == "buy":
                     pnl = (current_price - agg.avg_price) * agg.total_quantity
                 else:
                     pnl = (agg.avg_price - current_price) * agg.total_quantity
-                total_pnl += pnl
+                converted_pnl = self.convert_amount(pnl, quote_currency, base_currency)
+                total_pnl += converted_pnl if converted_pnl is not None else pnl
 
-        total_cost = sum(
-            agg.total_quantity * agg.avg_price for agg in [PositionAggregate(p, self.repository.get_transactions_by_position(p.id)) for p in open_positions]
-        )
+        total_cost = Decimal(0)
+        for pos in open_positions:
+            agg = PositionAggregate(pos, self.repository.get_transactions_by_position(pos.id))
+            cost = agg.total_quantity * agg.avg_price
+            converted_cost = self.convert_amount(cost, quote_currency_from_symbol(pos.symbol), base_currency)
+            total_cost += converted_cost if converted_cost is not None else cost
         total_pnl_pct = float(total_pnl / total_cost * 100) if total_cost > 0 else 0
 
         return {
             "portfolio_id": portfolio_id,
             "portfolio_name": portfolio.name if portfolio else "",
+            "currency": base_currency,
             "total_value": float(total_value),
             "total_pnl": float(total_pnl),
             "total_pnl_percent": total_pnl_pct,
@@ -307,3 +349,30 @@ class TradingService:
             }
         finally:
             db.close()
+
+    def get_fx_rates(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "from_currency": rate.from_currency,
+                "to_currency": rate.to_currency,
+                "rate": float(rate.rate),
+                "updated_at": rate.updated_at.isoformat() if rate.updated_at else None,
+            }
+            for rate in self.repository.list_fx_rates()
+        ]
+
+    def set_fx_rate(self, from_currency: str, to_currency: str, rate: Decimal) -> dict[str, Any]:
+        from_currency = from_currency.upper()
+        to_currency = to_currency.upper()
+        if from_currency == to_currency:
+            raise ValueError("from_currency and to_currency must differ")
+        fx_rate = self.repository.upsert_fx_rate(from_currency, to_currency, rate)
+        return {
+            "from_currency": fx_rate.from_currency,
+            "to_currency": fx_rate.to_currency,
+            "rate": float(fx_rate.rate),
+            "updated_at": fx_rate.updated_at.isoformat() if fx_rate.updated_at else None,
+        }
+
+    def delete_fx_rate(self, from_currency: str, to_currency: str) -> bool:
+        return self.repository.delete_fx_rate(from_currency.upper(), to_currency.upper())

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import TradingSessionLocal
 from app.modules.trading.models import (
+    FxRate,
     Notification,
     NotificationStatus,
     Position,
@@ -280,3 +281,34 @@ class TradingRepository:
             .values(status=NotificationStatus.READ)
         )
         self.db.commit()
+
+    def get_fx_rate(self, from_currency: str, to_currency: str) -> FxRate | None:
+        return self.db.scalar(
+            select(FxRate).where(
+                FxRate.from_currency == from_currency,
+                FxRate.to_currency == to_currency,
+            )
+        )
+
+    def upsert_fx_rate(self, from_currency: str, to_currency: str, rate: Decimal) -> FxRate:
+        fx_rate = self.get_fx_rate(from_currency, to_currency)
+        if fx_rate:
+            fx_rate.rate = rate
+            fx_rate.updated_at = datetime.utcnow()
+        else:
+            fx_rate = FxRate(from_currency=from_currency, to_currency=to_currency, rate=rate)
+            self.db.add(fx_rate)
+        self.db.commit()
+        self.db.refresh(fx_rate)
+        return fx_rate
+
+    def delete_fx_rate(self, from_currency: str, to_currency: str) -> bool:
+        fx_rate = self.get_fx_rate(from_currency, to_currency)
+        if not fx_rate:
+            return False
+        self.db.delete(fx_rate)
+        self.db.commit()
+        return True
+
+    def list_fx_rates(self) -> Sequence[FxRate]:
+        return self.db.scalars(select(FxRate).order_by(FxRate.from_currency, FxRate.to_currency)).all()

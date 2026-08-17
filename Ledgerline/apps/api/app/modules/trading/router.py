@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.modules.trading.models import TransactionType
 from app.modules.trading.repository import TradingRepository
 from app.modules.trading.schemas import (
+    FxRateCreate,
+    FxRateResponse,
     NotificationResponse,
     PortfolioCreate,
     PortfolioResponse,
@@ -280,3 +282,25 @@ async def get_report_stats(
     period: Literal["week", "month", "all"] = Query("week", description="week, month, or all"),
 ):
     return service.get_report_stats(period)
+
+
+@router.get("/exchange-rates", response_model=list[FxRateResponse])
+async def list_fx_rates():
+    return service.get_fx_rates()
+
+
+@router.post("/exchange-rates", response_model=FxRateResponse)
+async def set_fx_rate(data: FxRateCreate):
+    try:
+        return service.set_fx_rate(data.from_currency, data.to_currency, Decimal(str(data.rate)))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/exchange-rates", response_model=dict)
+async def delete_fx_rate(
+    from_currency: str = Query(description="Source currency"),
+    to_currency: str = Query(description="Target currency"),
+):
+    deleted = service.delete_fx_rate(from_currency, to_currency)
+    return {"success": deleted, "message": "Rate deleted" if deleted else "Rate not found"}

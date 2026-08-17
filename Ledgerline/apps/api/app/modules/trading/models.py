@@ -153,3 +153,17 @@ class Note(TradingBase):
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class FxRate(TradingBase):
+    __tablename__ = "fx_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    from_currency: Mapped[str] = mapped_column(String(10), index=True)
+    to_currency: Mapped[str] = mapped_column(String(10), index=True)
+    rate: Mapped[Decimal] = mapped_column(Numeric(24, 10))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("from_currency", "to_currency", name="uq_fx_rate_pair"),
+    )

@@ -44,6 +44,7 @@ class PositionSummary(BaseModel):
     avg_price: float
     total_amount: float
     total_fee: float
+    currency: str = "USD"
     current_price: float | None = None
     pnl: float | None = None
     pnl_percent: float | None = None
@@ -52,6 +53,7 @@ class PositionSummary(BaseModel):
 class PortfolioSummaryResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
+    currency: str = "USD"
     total_value: float
     total_pnl: float
     total_pnl_percent: float
@@ -121,3 +123,16 @@ class NotificationResponse(BaseModel):
     message: str
     symbol: str | None
     created_at: str
+
+
+class FxRateCreate(BaseModel):
+    from_currency: str = Field(description="Source currency (e.g., CNYT)")
+    to_currency: str = Field(description="Target currency (e.g., USD)")
+    rate: float = Field(gt=0, description="Exchange rate (1 from_currency = rate to_currency)")
+
+
+class FxRateResponse(BaseModel):
+    from_currency: str
+    to_currency: str
+    rate: float
+    updated_at: str
