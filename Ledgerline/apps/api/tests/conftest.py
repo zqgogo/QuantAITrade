@@ -4,6 +4,7 @@ import tempfile
 import pytest
 
 from app.db.session import TradingSessionLocal
+from app.modules.backtesting.models import BacktestRecord
 from app.modules.monitoring.models import AlertNotificationRecord, AlertRuleRecord
 from app.modules.trading.models import FxRate, Position, Portfolio, Transaction, Workspace
 
@@ -20,6 +21,7 @@ def _clean_db():
     try:
         db.execute(AlertNotificationRecord.__table__.delete())
         db.execute(AlertRuleRecord.__table__.delete())
+        db.execute(BacktestRecord.__table__.delete())
         db.execute(FxRate.__table__.delete())
         db.execute(Transaction.__table__.delete())
         db.execute(Position.__table__.delete())

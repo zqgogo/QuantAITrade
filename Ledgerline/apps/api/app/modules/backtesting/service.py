@@ -1,8 +1,13 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import List
 
+from sqlalchemy import select
+
+from app.db.session import TradingSessionLocal
 from app.modules.backtesting.engine import BacktestEngine, PerformanceCalculator
-from app.modules.backtesting.schemas import BacktestRequest, BacktestResult
+from app.modules.backtesting.models import BacktestRecord
+from app.modules.backtesting.schemas import BacktestRequest, BacktestResult, BacktestSummary
 from app.modules.market.repository import OhlcvRepository
 from app.modules.strategies.strategies import StrategyRegistry
 
@@ -10,6 +15,51 @@ from app.modules.strategies.strategies import StrategyRegistry
 class BacktestService:
     def __init__(self):
         self.ohlcv_repository = OhlcvRepository()
+
+    def _save_result(self, result: BacktestResult) -> None:
+        db = TradingSessionLocal()
+        try:
+            record = BacktestRecord(
+                strategy_name=result.strategy_name,
+                symbol=result.symbol,
+                interval=result.interval,
+                success=result.success,
+                initial_capital=Decimal(str(result.initial_capital)),
+                final_capital=Decimal(str(result.final_capital)),
+                total_return=result.metrics.total_return,
+                max_drawdown=result.metrics.max_drawdown,
+                sharpe_ratio=result.metrics.sharpe_ratio,
+                win_rate=result.metrics.win_rate,
+                total_trades=result.metrics.total_trades,
+                start_date=result.start_date,
+                end_date=result.end_date,
+            )
+            db.add(record)
+            db.commit()
+        finally:
+            db.close()
+
+    def get_recent_results(self, limit: int = 20) -> List[BacktestSummary]:
+        db = TradingSessionLocal()
+        try:
+            records = db.execute(
+                select(BacktestRecord)
+                .order_by(BacktestRecord.created_at.desc())
+                .limit(limit)
+            ).scalars().all()
+            return [
+                BacktestSummary(
+                    strategy_name=record.strategy_name,
+                    total_return=record.total_return,
+                    max_drawdown=record.max_drawdown,
+                    sharpe_ratio=record.sharpe_ratio,
+                    win_rate=record.win_rate,
+                    total_trades=record.total_trades,
+                )
+                for record in records
+            ]
+        finally:
+            db.close()
     
     def run_backtest(self, request: BacktestRequest) -> BacktestResult:
         strategy = StrategyRegistry.get_strategy(request.strategy_name)
@@ -85,7 +135,7 @@ class BacktestService:
             end_date,
         )
         
-        return BacktestResult(
+        result = BacktestResult(
             success=True,
             message=f"Backtest completed successfully with {len(engine.trades)//2} trades",
             strategy_name=request.strategy_name,
@@ -100,7 +150,9 @@ class BacktestService:
             trades=engine.trades,
             equity_curve=engine.equity_curve,
         )
-    
+        self._save_result(result)
+        return result
+
     def run_multiple_backtests(
         self,
         strategy_names: List[str],

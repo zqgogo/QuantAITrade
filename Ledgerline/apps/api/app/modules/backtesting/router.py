@@ -32,8 +32,8 @@ async def get_available_strategies() -> List[str]:
 
 
 @router.get("/results", response_model=BacktestListResponse)
-async def get_recent_backtests() -> BacktestListResponse:
-    return BacktestListResponse(backtests=[])
+async def get_recent_backtests(limit: int = Query(20, description="Max results to return")) -> BacktestListResponse:
+    return BacktestListResponse(backtests=backtest_service.get_recent_results(limit))
 
 
 @router.post("/quick-run", response_model=BacktestResult)
