@@ -44,5 +44,7 @@ jobs:
         run: npm --workspace apps/web run lint
       - name: TypeScript check
         run: npm --workspace apps/web run typecheck
+      - name: Unit tests (Vitest)
+        run: npm --workspace apps/web run test
       - name: Build
         run: npm --workspace apps/web run build
